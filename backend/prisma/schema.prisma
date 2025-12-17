@@ -1,0 +1,115 @@
+// ThinkTap Database Schema
+// PostgreSQL 16 with JSONB support
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// User Model
+model User {
+  id                   String               @id @default(uuid())
+  email                String               @unique
+  password             String               // bcrypt hashed
+  plan                 Plan                 @default(FREE)
+  stripeCustomerId     String?              // For payment integration
+  subscriptionId       String?              // For subscription tracking
+  subscriptionStatus   SubscriptionStatus   @default(INACTIVE)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  sessions             Session[]
+  responses            Response[]
+
+  @@index([email])
+}
+
+enum Plan {
+  FREE
+  PRO
+  FACULTY
+  UNIVERSITY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+// Session Model
+model Session {
+  id         String        @id @default(uuid())
+  code       String        @unique // 6-digit numeric code
+  lecturerId String
+  lecturer   User          @relation(fields: [lecturerId], references: [id], onDelete: Cascade)
+  mode       SessionMode
+  status     SessionStatus @default(CREATED)
+  createdAt  DateTime      @default(now())
+  endedAt    DateTime?
+  questions  Question[]
+  responses  Response[]
+
+  @@index([code])
+  @@index([lecturerId])
+}
+
+enum SessionMode {
+  RUSH
+  THINKING
+  SEMINAR
+}
+
+enum SessionStatus {
+  CREATED
+  ACTIVE
+  ENDED
+}
+
+// Question Model
+model Question {
+  id            String       @id @default(uuid())
+  sessionId     String
+  session       Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  type          QuestionType
+  question      String       @db.Text
+  options       Json?        // JSONB - For MC/MS: ["Option A", "Option B", ...]
+  correctAnswer Json         // JSONB - Varies by question type
+  timerSeconds  Int?
+  order         Int
+  createdAt     DateTime     @default(now())
+  responses     Response[]
+
+  @@index([sessionId])
+  @@index([sessionId, order])
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  MULTIPLE_SELECT
+  SHORT_ANSWER
+  LONG_ANSWER
+}
+
+// Response Model
+model Response {
+  id             String    @id @default(uuid())
+  sessionId      String
+  session        Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId     String
+  question       Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  userId         String?   // Nullable for anonymous (Seminar mode)
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  response       Json      // JSONB - Student's answer
+  isCorrect      Boolean?  // Calculated based on question type
+  responseTimeMs Int       // Time taken to answer in milliseconds
+  submittedAt    DateTime  @default(now())
+
+  @@index([sessionId])
+  @@index([questionId])
+  @@index([userId])
+}
