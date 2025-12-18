@@ -20,10 +20,25 @@ model User {
   subscriptionStatus   SubscriptionStatus   @default(INACTIVE)
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
+  quizzes              Quiz[]
   sessions             Session[]
   responses            Response[]
 
   @@index([email])
+}
+
+// Quiz Model - Reusable content that can be hosted in multiple sessions
+model Quiz {
+  id         String     @id @default(uuid())
+  title      String
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions  Question[]
+  sessions   Session[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([userId])
 }
 
 enum Plan {
@@ -40,21 +55,23 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
-// Session Model
+// Session Model - A live event/game that uses a Quiz
 model Session {
   id         String        @id @default(uuid())
   code       String        @unique // 6-digit numeric code
   lecturerId String
   lecturer   User          @relation(fields: [lecturerId], references: [id], onDelete: Cascade)
+  quizId     String?       // Link to the Quiz being played
+  quiz       Quiz?         @relation(fields: [quizId], references: [id], onDelete: SetNull)
   mode       SessionMode
   status     SessionStatus @default(CREATED)
   createdAt  DateTime      @default(now())
   endedAt    DateTime?
-  questions  Question[]
   responses  Response[]
 
   @@index([code])
   @@index([lecturerId])
+  @@index([quizId])
 }
 
 enum SessionMode {
@@ -69,11 +86,11 @@ enum SessionStatus {
   ENDED
 }
 
-// Question Model
+// Question Model - Belongs to a Quiz, not a Session
 model Question {
   id            String       @id @default(uuid())
-  sessionId     String
-  session       Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  quizId        String
+  quiz          Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
   type          QuestionType
   question      String       @db.Text
   options       Json?        // JSONB - For MC/MS: ["Option A", "Option B", ...]
@@ -83,8 +100,8 @@ model Question {
   createdAt     DateTime     @default(now())
   responses     Response[]
 
-  @@index([sessionId])
-  @@index([sessionId, order])
+  @@index([quizId])
+  @@index([quizId, order])
 }
 
 enum QuestionType {
@@ -104,12 +121,15 @@ model Response {
   question       Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
   userId         String?   // Nullable for anonymous (Seminar mode)
   user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  nickname       String?   // Student's nickname for anonymous play
   response       Json      // JSONB - Student's answer
   isCorrect      Boolean?  // Calculated based on question type
+  points         Int       @default(0) // Points awarded for this response
   responseTimeMs Int       // Time taken to answer in milliseconds
   submittedAt    DateTime  @default(now())
 
   @@index([sessionId])
   @@index([questionId])
   @@index([userId])
+  @@index([sessionId, nickname]) // For leaderboard queries
 }

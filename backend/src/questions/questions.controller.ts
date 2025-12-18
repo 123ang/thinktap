@@ -12,36 +12,36 @@ import { QuestionsService } from './questions.service';
 import { CreateQuestionDto, BulkCreateQuestionsDto } from './dto/question.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-@Controller('sessions/:sessionId/questions')
+@Controller('quizzes/:quizId/questions')
 @UseGuards(JwtAuthGuard)
 export class QuestionsController {
   constructor(private questionsService: QuestionsService) {}
 
   @Post()
   async create(
-    @Param('sessionId') sessionId: string,
+    @Param('quizId') quizId: string,
     @Request() req,
     @Body() createQuestionDto: CreateQuestionDto,
   ) {
-    return this.questionsService.create(sessionId, req.user.id, createQuestionDto);
+    return this.questionsService.create(quizId, req.user.id, createQuestionDto);
   }
 
   @Post('bulk')
   async createBulk(
-    @Param('sessionId') sessionId: string,
+    @Param('quizId') quizId: string,
     @Request() req,
     @Body() bulkDto: BulkCreateQuestionsDto,
   ) {
     return this.questionsService.createBulk(
-      sessionId,
+      quizId,
       req.user.id,
       bulkDto.questions,
     );
   }
 
   @Get()
-  async findAll(@Param('sessionId') sessionId: string) {
-    return this.questionsService.findAll(sessionId);
+  async findAll(@Param('quizId') quizId: string) {
+    return this.questionsService.findAll(quizId);
   }
 
   @Get(':questionId')

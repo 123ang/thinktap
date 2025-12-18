@@ -27,6 +27,19 @@ export class SessionsService {
       throw new NotFoundException('User not found');
     }
 
+    // Verify quiz exists and user owns it
+    const quiz = await this.prismaService.quiz.findUnique({
+      where: { id: createSessionDto.quizId },
+    });
+
+    if (!quiz) {
+      throw new NotFoundException('Quiz not found');
+    }
+
+    if (quiz.userId !== userId) {
+      throw new ForbiddenException('You can only host your own quizzes');
+    }
+
     // Generate unique session code
     let code: string;
     let isUnique = false;
@@ -51,7 +64,8 @@ export class SessionsService {
       data: {
         code: code!,
         lecturerId: userId,
-        mode: createSessionDto.mode,
+        quizId: createSessionDto.quizId,
+        mode: createSessionDto.mode || 'RUSH',
         status: SessionStatus.CREATED,
       },
       include: {
@@ -62,6 +76,13 @@ export class SessionsService {
             plan: true,
           },
         },
+        quiz: {
+          include: {
+            questions: {
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
       },
     });
 
@@ -69,32 +90,17 @@ export class SessionsService {
   }
 
   async findAll(userId: string) {
-    const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
-      select: { plan: true },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    // For FREE users, only return active sessions (no history)
-    const whereClause =
-      user.plan === Plan.FREE
-        ? {
-            lecturerId: userId,
-            status: { not: SessionStatus.ENDED },
-          }
-        : {
-            lecturerId: userId,
-          };
-
     const sessions = await this.prismaService.session.findMany({
-      where: whereClause,
+      where: { lecturerId: userId },
       include: {
+        quiz: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
         _count: {
           select: {
-            questions: true,
             responses: true,
           },
         },
@@ -107,7 +113,7 @@ export class SessionsService {
     return sessions;
   }
 
-  async findOne(sessionId: string, userId: string) {
+  async findOne(sessionId: string, userId?: string) {
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -118,8 +124,12 @@ export class SessionsService {
             plan: true,
           },
         },
-        questions: {
-          orderBy: { order: 'asc' },
+        quiz: {
+          include: {
+            questions: {
+              orderBy: { order: 'asc' },
+            },
+          },
         },
         _count: {
           select: {
@@ -133,18 +143,9 @@ export class SessionsService {
       throw new NotFoundException('Session not found');
     }
 
-    // Check if user is the lecturer or if session is active
-    if (session.lecturerId !== userId && session.status !== SessionStatus.ACTIVE) {
+    // If userId provided, check access
+    if (userId && session.lecturerId !== userId && session.status !== SessionStatus.ACTIVE) {
       throw new ForbiddenException('Access denied');
-    }
-
-    // For FREE users, deny access to ended sessions (no history)
-    if (
-      session.lecturerId === userId &&
-      session.lecturer.plan === Plan.FREE &&
-      session.status === SessionStatus.ENDED
-    ) {
-      throw new ForbiddenException('Session history not available on free plan');
     }
 
     return session;

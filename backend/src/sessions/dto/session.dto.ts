@@ -1,13 +1,13 @@
-import { IsEnum, IsString, IsOptional } from 'class-validator';
+import { IsEnum, IsString, IsOptional, IsUUID } from 'class-validator';
 import { SessionMode } from '@prisma/client';
 
 export class CreateSessionDto {
-  @IsEnum(SessionMode)
-  mode: SessionMode;
+  @IsUUID()
+  quizId: string; // Required: the quiz to host
 
-  @IsString()
+  @IsEnum(SessionMode)
   @IsOptional()
-  title?: string;
+  mode?: SessionMode;
 }
 
 export class JoinSessionDto {

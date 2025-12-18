@@ -2,37 +2,31 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateQuestionDto } from './dto/question.dto';
-import { SessionStatus } from '@prisma/client';
 
 @Injectable()
 export class QuestionsService {
   constructor(private prismaService: PrismaService) {}
 
-  async create(sessionId: string, userId: string, createQuestionDto: CreateQuestionDto) {
-    // Verify session exists and user is the lecturer
-    const session = await this.prismaService.session.findUnique({
-      where: { id: sessionId },
+  async create(quizId: string, userId: string, createQuestionDto: CreateQuestionDto) {
+    // Verify quiz exists and user owns it
+    const quiz = await this.prismaService.quiz.findUnique({
+      where: { id: quizId },
     });
 
-    if (!session) {
-      throw new NotFoundException('Session not found');
+    if (!quiz) {
+      throw new NotFoundException('Quiz not found');
     }
 
-    if (session.lecturerId !== userId) {
-      throw new ForbiddenException('Only the lecturer can add questions');
-    }
-
-    if (session.status === SessionStatus.ENDED) {
-      throw new BadRequestException('Cannot add questions to an ended session');
+    if (quiz.userId !== userId) {
+      throw new ForbiddenException('Only the quiz owner can add questions');
     }
 
     const question = await this.prismaService.question.create({
       data: {
-        sessionId,
+        quizId,
         type: createQuestionDto.type,
         question: createQuestionDto.question,
         options: createQuestionDto.options ?? undefined,
@@ -42,36 +36,38 @@ export class QuestionsService {
       },
     });
 
+    // Update quiz's updatedAt
+    await this.prismaService.quiz.update({
+      where: { id: quizId },
+      data: { updatedAt: new Date() },
+    });
+
     return question;
   }
 
   async createBulk(
-    sessionId: string,
+    quizId: string,
     userId: string,
     questions: CreateQuestionDto[],
   ) {
-    // Verify session exists and user is the lecturer
-    const session = await this.prismaService.session.findUnique({
-      where: { id: sessionId },
+    // Verify quiz exists and user owns it
+    const quiz = await this.prismaService.quiz.findUnique({
+      where: { id: quizId },
     });
 
-    if (!session) {
-      throw new NotFoundException('Session not found');
+    if (!quiz) {
+      throw new NotFoundException('Quiz not found');
     }
 
-    if (session.lecturerId !== userId) {
-      throw new ForbiddenException('Only the lecturer can add questions');
-    }
-
-    if (session.status === SessionStatus.ENDED) {
-      throw new BadRequestException('Cannot add questions to an ended session');
+    if (quiz.userId !== userId) {
+      throw new ForbiddenException('Only the quiz owner can add questions');
     }
 
     const createdQuestions = await this.prismaService.$transaction(
       questions.map((q) =>
         this.prismaService.question.create({
           data: {
-            sessionId,
+            quizId,
             type: q.type,
             question: q.question,
             options: q.options ?? undefined,
@@ -83,12 +79,18 @@ export class QuestionsService {
       ),
     );
 
+    // Update quiz's updatedAt
+    await this.prismaService.quiz.update({
+      where: { id: quizId },
+      data: { updatedAt: new Date() },
+    });
+
     return createdQuestions;
   }
 
-  async findAll(sessionId: string) {
+  async findAll(quizId: string) {
     const questions = await this.prismaService.question.findMany({
-      where: { sessionId },
+      where: { quizId },
       orderBy: { order: 'asc' },
       include: {
         _count: {
@@ -106,11 +108,11 @@ export class QuestionsService {
     const question = await this.prismaService.question.findUnique({
       where: { id: questionId },
       include: {
-        session: {
+        quiz: {
           select: {
             id: true,
-            mode: true,
-            status: true,
+            title: true,
+            userId: true,
           },
         },
         _count: {
@@ -132,9 +134,9 @@ export class QuestionsService {
     const question = await this.prismaService.question.findUnique({
       where: { id: questionId },
       include: {
-        session: {
+        quiz: {
           select: {
-            lecturerId: true,
+            userId: true,
           },
         },
       },
@@ -144,8 +146,8 @@ export class QuestionsService {
       throw new NotFoundException('Question not found');
     }
 
-    if (question.session.lecturerId !== userId) {
-      throw new ForbiddenException('Only the lecturer can delete questions');
+    if (question.quiz.userId !== userId) {
+      throw new ForbiddenException('Only the quiz owner can delete questions');
     }
 
     await this.prismaService.question.delete({

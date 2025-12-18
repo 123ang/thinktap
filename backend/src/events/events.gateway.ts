@@ -53,6 +53,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private sessionParticipants: Map<string, Set<string>> = new Map();
+  private participantNames: Map<string, string> = new Map();
   private userSessions: Map<string, string> = new Map();
 
   constructor(
@@ -74,10 +75,16 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const participants = this.sessionParticipants.get(sessionId);
       if (participants) {
         participants.delete(client.id);
+        this.participantNames.delete(client.id);
         
         // Notify others about participant count update
+        const names = Array.from(participants)
+          .map((id) => this.participantNames.get(id))
+          .filter((n): n is string => !!n);
+
         this.server.to(sessionId).emit('participant_count', {
           count: participants.size,
+          names,
         });
       }
       this.userSessions.delete(client.id);
@@ -96,12 +103,34 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Join socket room
       await client.join(session.id);
 
-      // Track participants
-      if (!this.sessionParticipants.has(session.id)) {
-        this.sessionParticipants.set(session.id, new Set());
+      // Track participants - only count students as participants
+      if (payload.role === 'student') {
+        if (!this.sessionParticipants.has(session.id)) {
+          this.sessionParticipants.set(session.id, new Set());
+        }
+        const participants = this.sessionParticipants.get(session.id)!;
+
+        // Prevent duplicate nicknames in the same session
+        if (payload.userEmail) {
+          const namesInSession = Array.from(participants)
+            .map((id) => this.participantNames.get(id))
+            .filter((n): n is string => !!n);
+          if (namesInSession.includes(payload.userEmail)) {
+            client.emit('join_rejected', {
+              reason: 'duplicate_nickname',
+              message:
+                'This nickname is already taken in this session. Please choose another one.',
+            });
+            return { success: false, error: 'Duplicate nickname' };
+          }
+        }
+
+        participants.add(client.id);
+        this.userSessions.set(client.id, session.id);
+        if (payload.userEmail) {
+          this.participantNames.set(client.id, payload.userEmail);
+        }
       }
-      this.sessionParticipants.get(session.id)!.add(client.id);
-      this.userSessions.set(client.id, session.id);
 
       // Emit success to client
       client.emit('session_joined', {
@@ -113,10 +142,16 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         },
       });
 
-      // Broadcast participant count to all in session
-      const participantCount = this.sessionParticipants.get(session.id)!.size;
+      // Broadcast participant count and names to all in session
+      const participants = this.sessionParticipants.get(session.id) || new Set<string>();
+      const participantCount = participants.size;
+      const names = Array.from(participants)
+        .map((id) => this.participantNames.get(id))
+        .filter((n): n is string => !!n);
+
       this.server.to(session.id).emit('participant_count', {
         count: participantCount,
+        names,
       });
 
       return { success: true, sessionId: session.id };

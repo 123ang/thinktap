@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
+import { QuizzesModule } from './quizzes/quizzes.module';
 import { SessionsModule } from './sessions/sessions.module';
 import { QuestionsModule } from './questions/questions.module';
 import { ResponsesModule } from './responses/responses.module';
@@ -17,6 +18,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     }),
     PrismaModule,
     AuthModule,
+    QuizzesModule,
     SessionsModule,
     QuestionsModule,
     ResponsesModule,

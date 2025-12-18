@@ -194,13 +194,32 @@ DATABASE_URL="postgresql://thinktap:mypassword123@localhost:5432/thinktap"
    **Important**: The `CREATEDB` privilege is required for Prisma Migrate to create shadow databases during development.
 
 **Run migrations:**
-Back in your original terminal (in the `backend` folder):
+Back in your original terminal, **make sure you're in the `backend` folder**:
+```bash
+cd backend
+```
+
+**Verify you're in the right place:**
+- You should see `prisma` folder in the current directory
+- Run: `ls prisma` (Mac/Linux) or `dir prisma` (Windows) to confirm
+
+Then run:
 ```bash
 npx prisma generate
 npx prisma migrate dev
 ```
 
 ✅ **Success!** You should see: "Your database is now in sync with your schema."
+
+**Alternative (if migrate dev has issues):**
+If you encounter permission or lock timeout errors, you can use `db push` instead:
+```bash
+npx prisma generate
+npx prisma db push
+```
+This syncs your schema without creating migration files (useful for initial setup).
+
+⚠️ **Important**: These commands MUST be run from the `backend` directory, not from the project root!
 
 ### 2.7 Start the Backend
 ```bash
@@ -572,6 +591,84 @@ If the above doesn't work, drop and recreate the user:
 DROP USER thinktap;
 CREATE USER thinktap WITH PASSWORD 'yourpassword' CREATEDB;
 GRANT ALL PRIVILEGES ON DATABASE thinktap TO thinktap;
+```
+
+### Problem: "Could not find Prisma Schema" or "schema.prisma: file not found"
+**Solution**: You're not in the `backend` directory, or the schema file is missing.
+
+**Quick Fix:**
+1. Check your current directory:
+   ```powershell
+   pwd
+   ```
+   (Windows) or
+   ```bash
+   pwd
+   ```
+   (Mac/Linux)
+
+2. **Navigate to the backend folder:**
+   ```powershell
+   cd backend
+   ```
+   (If you're in the project root)
+
+3. **Verify the schema file exists:**
+   ```powershell
+   dir prisma\schema.prisma
+   ```
+   (Windows) or
+   ```bash
+   ls prisma/schema.prisma
+   ```
+   (Mac/Linux)
+
+4. **If the file exists, run the command again:**
+   ```bash
+   npx prisma generate
+   npx prisma migrate dev
+   ```
+
+**If the file doesn't exist:**
+- The schema file should be at: `backend/prisma/schema.prisma`
+- If it's missing, check your project structure
+- Make sure you cloned/downloaded the complete project
+
+**Remember**: Prisma commands must be run from the `backend` directory!
+
+### Problem: "permission denied for schema public" or "ERROR: permission denied for schema public"
+**Solution**: The `thinktap` user doesn't have permissions on the `public` schema.
+
+**Fix - Grant permissions:**
+1. Connect to PostgreSQL as `postgres` user:
+   ```powershell
+   psql -U postgres -d thinktap
+   ```
+   (Or use full path: `& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -d thinktap`)
+
+2. Run these SQL commands:
+   ```sql
+   GRANT ALL ON SCHEMA public TO thinktap;
+   GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO thinktap;
+   GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO thinktap;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO thinktap;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO thinktap;
+   \q
+   ```
+
+3. Try Prisma commands again:
+   ```bash
+   npx prisma migrate dev
+   ```
+   Or use the alternative:
+   ```bash
+   npx prisma db push
+   ```
+
+**Quick PowerShell Fix (if you know the postgres password):**
+```powershell
+$env:PGPASSWORD='your_postgres_password'
+psql -U postgres -d thinktap -c "GRANT ALL ON SCHEMA public TO thinktap; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO thinktap; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO thinktap; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO thinktap; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO thinktap;"
 ```
 
 ### Problem: "Cannot connect to backend"
