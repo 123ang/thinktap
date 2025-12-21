@@ -27,20 +27,27 @@ export class AnalyticsService {
             plan: true,
           },
         },
-        questions: {
+        quiz: {
           include: {
-            responses: {
+            questions: {
               include: {
-                user: {
-                  select: {
-                    id: true,
-                    email: true,
+                responses: {
+                  where: {
+                    sessionId: sessionId,
+                  },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        email: true,
+                      },
+                    },
                   },
                 },
               },
+              orderBy: { order: 'asc' },
             },
           },
-          orderBy: { order: 'asc' },
         },
       },
     });
@@ -62,23 +69,29 @@ export class AnalyticsService {
       throw new ForbiddenException('Session history not available on free plan');
     }
 
+    if (!session.quiz) {
+      throw new NotFoundException('Session has no quiz associated');
+    }
+
+    const questions = session.quiz.questions;
+
     // Calculate unique participants
     const uniqueParticipants = new Set(
-      session.questions.flatMap((q) =>
+      questions.flatMap((q) =>
         q.responses.map((r) => r.userId).filter(Boolean),
       ),
     );
 
-    const totalResponses = session.questions.reduce(
+    const totalResponses = questions.reduce(
       (sum, q) => sum + q.responses.length,
       0,
     );
 
     const avgResponsesPerQuestion =
-      session.questions.length > 0 ? totalResponses / session.questions.length : 0;
+      questions.length > 0 ? totalResponses / questions.length : 0;
 
     // Calculate question insights
-    const questionInsights: QuestionInsight[] = session.questions.map((question) => {
+    const questionInsights: QuestionInsight[] = questions.map((question) => {
       const responses = question.responses;
       const totalResponses = responses.length;
       const correctResponses = responses.filter((r) => r.isCorrect === true).length;
@@ -130,7 +143,7 @@ export class AnalyticsService {
     // Calculate average response time across all questions
     const avgResponseTime =
       totalResponses > 0
-        ? session.questions
+        ? questions
             .flatMap((q) => q.responses)
             .reduce((sum, r) => sum + r.responseTimeMs, 0) / totalResponses
         : 0;
@@ -142,7 +155,7 @@ export class AnalyticsService {
       status: session.status,
       createdAt: session.createdAt,
       endedAt: session.endedAt || undefined,
-      totalQuestions: session.questions.length,
+      totalQuestions: questions.length,
       totalResponses,
       totalParticipants: uniqueParticipants.size,
       avgResponsesPerQuestion: Math.round(avgResponsesPerQuestion * 100) / 100,
@@ -177,14 +190,21 @@ export class AnalyticsService {
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
       include: {
-        questions: {
+        quiz: {
           include: {
-            responses: {
+            questions: {
               include: {
-                user: {
-                  select: {
-                    id: true,
-                    email: true,
+                responses: {
+                  where: {
+                    sessionId: sessionId,
+                  },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        email: true,
+                      },
+                    },
                   },
                 },
               },
@@ -194,7 +214,7 @@ export class AnalyticsService {
       },
     });
 
-    if (!session) {
+    if (!session || !session.quiz) {
       throw new NotFoundException('Session not found');
     }
 
@@ -211,7 +231,7 @@ export class AnalyticsService {
       }
     >();
 
-    session.questions.forEach((question) => {
+    session.quiz.questions.forEach((question) => {
       question.responses.forEach((response) => {
         if (!response.userId) return; // Skip anonymous responses
 
@@ -270,18 +290,25 @@ export class AnalyticsService {
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
       include: {
-        questions: {
+        quiz: {
           include: {
-            responses: {
+            questions: {
               include: {
-                user: anonymous
-                  ? false
-                  : {
-                      select: {
-                        id: true,
-                        email: true,
-                      },
-                    },
+                responses: {
+                  where: {
+                    sessionId: sessionId,
+                  },
+                  include: {
+                    user: anonymous
+                      ? false
+                      : {
+                          select: {
+                            id: true,
+                            email: true,
+                          },
+                        },
+                  },
+                },
               },
             },
           },
@@ -289,11 +316,11 @@ export class AnalyticsService {
       },
     });
 
-    if (!session) {
+    if (!session || !session.quiz) {
       throw new NotFoundException('Session not found');
     }
 
-    const totalQuestions = session.questions.length;
+    const totalQuestions = session.quiz.questions.length;
     const participantStats = new Map<
       string,
       {
@@ -305,7 +332,7 @@ export class AnalyticsService {
       }
     >();
 
-    session.questions.forEach((question) => {
+    session.quiz.questions.forEach((question) => {
       question.responses.forEach((response) => {
         const key = anonymous ? 'anonymous' : (response.userId || 'anonymous');
         const existing = participantStats.get(key) || {
@@ -361,24 +388,32 @@ export class AnalyticsService {
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
       include: {
-        questions: {
+        quiz: {
           include: {
-            responses: true,
+            questions: {
+              include: {
+                responses: {
+                  where: {
+                    sessionId: sessionId,
+                  },
+                },
+              },
+            },
           },
         },
       },
     });
 
-    if (!session) {
+    if (!session || !session.quiz) {
       throw new NotFoundException('Session not found');
     }
 
-    const totalResponses = session.questions.reduce(
+    const totalResponses = session.quiz.questions.reduce(
       (sum, q) => sum + q.responses.length,
       0,
     );
 
-    const correctResponses = session.questions
+    const correctResponses = session.quiz.questions
       .flatMap((q) => q.responses)
       .filter((r) => r.isCorrect === true).length;
 
@@ -388,7 +423,7 @@ export class AnalyticsService {
     // Response distribution per question
     const responseDistribution: Record<string, Record<string, number>> = {};
 
-    session.questions.forEach((question) => {
+    session.quiz.questions.forEach((question) => {
       const questionKey = `Q${question.order}`;
       responseDistribution[questionKey] = {};
 
@@ -428,11 +463,14 @@ export class AnalyticsService {
     const sessions = await this.prismaService.session.findMany({
       where: whereClause,
       include: {
-        questions: true,
+        quiz: {
+          include: {
+            questions: true,
+          },
+        },
         responses: true,
         _count: {
           select: {
-            questions: true,
             responses: true,
           },
         },
@@ -444,7 +482,7 @@ export class AnalyticsService {
 
     const totalSessions = sessions.length;
     const totalQuestions = sessions.reduce(
-      (sum, s) => sum + s._count.questions,
+      (sum, s) => sum + (s.quiz?.questions.length || 0),
       0,
     );
     const totalResponses = sessions.reduce(
@@ -505,7 +543,7 @@ export class AnalyticsService {
         status: s.status,
         createdAt: s.createdAt,
         participantCount: uniqueParticipants.size,
-        questionCount: s._count.questions,
+        questionCount: s.quiz?.questions.length || 0,
       };
     });
 
@@ -531,12 +569,21 @@ export class AnalyticsService {
     const question = await this.prismaService.question.findUnique({
       where: { id: questionId },
       include: {
-        session: {
+        quiz: {
           include: {
-            lecturer: {
+            user: {
               select: {
                 id: true,
                 plan: true,
+              },
+            },
+            sessions: {
+              where: {
+                lecturerId: userId,
+              },
+              select: {
+                id: true,
+                status: true,
               },
             },
           },
@@ -549,14 +596,15 @@ export class AnalyticsService {
       throw new NotFoundException('Question not found');
     }
 
-    if (question.session.lecturerId !== userId) {
+    if (question.quiz.userId !== userId) {
       throw new ForbiddenException('Access denied');
     }
 
-    // Check if user has access to history
+    // Check if user has access to history - find an ended session for this question
+    const endedSession = question.quiz.sessions.find(s => s.status === 'ENDED');
     if (
-      question.session.lecturer.plan === Plan.FREE &&
-      question.session.status === 'ENDED'
+      question.quiz.user.plan === Plan.FREE &&
+      endedSession
     ) {
       throw new ForbiddenException('Question analytics not available on free plan');
     }

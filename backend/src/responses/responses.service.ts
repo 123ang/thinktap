@@ -72,16 +72,26 @@ export class ResponsesService {
       throw new BadRequestException('Session is not active');
     }
 
-    // Get question details
+    // Get question details and verify it belongs to the session's quiz
     const question = await this.prismaService.question.findUnique({
       where: { id: submitResponseDto.questionId },
+      include: {
+        quiz: {
+          include: {
+            sessions: {
+              where: { id: sessionId },
+            },
+          },
+        },
+      },
     });
 
     if (!question) {
       throw new NotFoundException('Question not found');
     }
 
-    if (question.sessionId !== sessionId) {
+    // Verify question belongs to a quiz that's used in this session
+    if (!question.quiz.sessions.some(s => s.id === sessionId)) {
       throw new BadRequestException('Question does not belong to this session');
     }
 
@@ -161,7 +171,16 @@ export class ResponsesService {
     const question = await this.prismaService.question.findUnique({
       where: { id: questionId },
       include: {
-        session: true,
+        responses: {
+          take: 1,
+          include: {
+            session: {
+              select: {
+                mode: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -169,10 +188,13 @@ export class ResponsesService {
       throw new NotFoundException('Question not found');
     }
 
+    // Get session mode from first response, or default
+    const sessionMode = question.responses[0]?.session?.mode || SessionMode.RUSH;
+
     const responses = await this.prismaService.response.findMany({
       where: { questionId },
       include: {
-        user: question.session.mode === SessionMode.SEMINAR
+        user: sessionMode === SessionMode.SEMINAR
           ? false
           : {
               select: {
@@ -187,7 +209,7 @@ export class ResponsesService {
     });
 
     // For Seminar mode, ensure user information is not exposed
-    if (question.session.mode === SessionMode.SEMINAR) {
+    if (sessionMode === SessionMode.SEMINAR) {
       return responses.map((r) => ({
         ...r,
         userId: null,
@@ -202,27 +224,37 @@ export class ResponsesService {
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
       include: {
-        questions: {
+        quiz: {
           include: {
-            responses: true,
+            questions: {
+              include: {
+                responses: {
+                  where: {
+                    sessionId: sessionId,
+                  },
+                },
+              },
+            },
           },
         },
       },
     });
 
-    if (!session) {
+    if (!session || !session.quiz) {
       throw new NotFoundException('Session not found');
     }
+
+    const questions = session.quiz.questions;
 
     const insights = {
       sessionId,
       mode: session.mode,
-      totalQuestions: session.questions.length,
-      totalResponses: session.questions.reduce(
+      totalQuestions: questions.length,
+      totalResponses: questions.reduce(
         (sum, q) => sum + q.responses.length,
         0,
       ),
-      questions: session.questions.map((question) => {
+      questions: questions.map((question) => {
         const responses = question.responses;
         const totalResponses = responses.length;
         const correctResponses = responses.filter((r) => r.isCorrect === true).length;

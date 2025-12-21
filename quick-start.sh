@@ -54,9 +54,9 @@ echo ""
 echo -e "${BLUE}Setting up Frontend...${NC}"
 cd ../frontend
 
-if [ ! -f ".env.local" ]; then
-    echo "Creating .env.local file from example..."
-    cp env.example .env.local
+if [ ! -f ".env" ]; then
+    echo "Creating .env file from example..."
+    cp env.example .env
 fi
 
 echo "Installing dependencies..."

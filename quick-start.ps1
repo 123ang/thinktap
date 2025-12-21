@@ -49,9 +49,9 @@ Write-Host ""
 Write-Host "Setting up Frontend..." -ForegroundColor Blue
 Set-Location ..\frontend
 
-if (-not (Test-Path ".env.local")) {
-    Write-Host "Creating .env.local file from example..."
-    Copy-Item env.example .env.local
+if (-not (Test-Path ".env")) {
+    Write-Host "Creating .env file from example..."
+    Copy-Item env.example .env
 }
 
 Write-Host "Installing dependencies..."
