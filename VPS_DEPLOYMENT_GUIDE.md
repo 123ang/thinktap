@@ -159,8 +159,11 @@ nano .env
 # Database (will use docker-compose values)
 DATABASE_URL=postgresql://thinktap:YOUR_STRONG_PASSWORD@postgres:5432/thinktap
 
-# Generate JWT secrets (run on your local machine or server):
-# node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Generate JWT secrets (run TWICE - once for each secret):
+# FIRST RUN: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Copy output → use for JWT_SECRET
+# SECOND RUN: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Copy output → use for JWT_REFRESH_SECRET (must be different!)
 JWT_SECRET=YOUR_GENERATED_JWT_SECRET_HERE
 JWT_REFRESH_SECRET=YOUR_GENERATED_REFRESH_SECRET_HERE
 JWT_EXPIRES_IN=15m

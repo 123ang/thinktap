@@ -109,17 +109,32 @@ SOCKET_URL=https://thinktap.link
 
 ## Step 3: Generate JWT Secrets
 
+**⚠️ Important:** You need to run the command **TWICE** - once for JWT_SECRET and once for JWT_REFRESH_SECRET. They must be different values!
+
 **On your local machine or VPS:**
 
 ```bash
-# Generate JWT Secret
+# Generate JWT Secret (FIRST RUN)
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Copy this output - use it for JWT_SECRET
 
-# Generate Refresh Secret (run again to get a different value)
+# Generate Refresh Secret (SECOND RUN - run the command again!)
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Copy this output - use it for JWT_REFRESH_SECRET
 ```
 
-**Copy the output** and use it for `JWT_SECRET` and `JWT_REFRESH_SECRET` in both `backend/.env` and root `.env`.
+**Example:**
+```bash
+$ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcdef
+# ↑ Use this for JWT_SECRET
+
+$ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+x9y8z7w6v5u4321098765432109876543210fedcba9876543210fedcba9876543210fedcba
+# ↑ Use this for JWT_REFRESH_SECRET (DIFFERENT value!)
+```
+
+**Copy both outputs** and use them for `JWT_SECRET` and `JWT_REFRESH_SECRET` in both `backend/.env` and root `.env`. **Make sure they are different values!**
 
 ---
 

@@ -50,17 +50,23 @@ SOCKET_URL=https://thinktap.link
 
 ## 🔑 Generate Secrets
 
+**⚠️ Important:** Run the command **TWICE** - once for JWT_SECRET, once for JWT_REFRESH_SECRET. They must be different values!
+
 **Run these commands to generate secure JWT secrets:**
 
 ```bash
-# JWT Secret
+# JWT Secret (FIRST RUN)
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Copy output → use for JWT_SECRET
 
-# Refresh Secret (run again for different value)
+# Refresh Secret (SECOND RUN - run again!)
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Copy output → use for JWT_REFRESH_SECRET (must be different!)
 ```
 
-**Important:** Use the SAME secrets in both `backend/.env` and root `.env`
+**Important:** 
+- Use the SAME secrets in both `backend/.env` and root `.env`
+- JWT_SECRET and JWT_REFRESH_SECRET must be **different values**
 
 ---
 

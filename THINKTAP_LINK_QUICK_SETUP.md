@@ -34,17 +34,21 @@ cd thinktap
 
 ## Step 3: Generate JWT Secrets
 
+**⚠️ Important:** Run the command **TWICE** - once for JWT_SECRET, once for JWT_REFRESH_SECRET. They must be different!
+
 **On your local machine or VPS:**
 
 ```bash
-# Generate JWT Secret
+# Generate JWT Secret (FIRST RUN)
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Copy this output → use for JWT_SECRET
 
-# Generate Refresh Secret (run again)
+# Generate Refresh Secret (SECOND RUN - run again!)
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Copy this output → use for JWT_REFRESH_SECRET (must be different!)
 ```
 
-**Save both outputs** - you'll need them in the next step.
+**Save both outputs** - you'll need them in the next step. **They must be different values!**
 
 ---
 

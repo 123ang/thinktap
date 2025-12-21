@@ -83,7 +83,7 @@ sudo -u postgres psql
 
 # In PostgreSQL prompt, run:
 CREATE DATABASE thinktap;
-CREATE USER thinktap WITH PASSWORD 'YOUR_STRONG_PASSWORD_HERE';
+CREATE USER thinktap WITH PASSWORD '920214';
 ALTER ROLE thinktap CREATEDB;
 GRANT ALL PRIVILEGES ON DATABASE thinktap TO thinktap;
 \q
@@ -91,7 +91,26 @@ GRANT ALL PRIVILEGES ON DATABASE thinktap TO thinktap;
 
 **Important:** Replace `YOUR_STRONG_PASSWORD_HERE` with a strong password. Save this password - you'll need it for the backend configuration.
 
-### 3.4 Configure PostgreSQL for Remote Access (Optional)
+### 3.4 Grant Schema Permissions (Required for Prisma)
+
+**⚠️ Important:** After creating the database and user, you MUST grant permissions on the `public` schema, otherwise Prisma migrations will fail with "permission denied for schema public" error.
+
+```bash
+# Connect to PostgreSQL as postgres user
+sudo -u postgres psql -d thinktap
+
+# Grant permissions on public schema
+GRANT ALL ON SCHEMA public TO thinktap;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO thinktap;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO thinktap;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO thinktap;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO thinktap;
+\q
+```
+
+**Why this is needed:** Prisma needs these permissions to create migration tables and manage the database schema.
+
+### 3.5 Configure PostgreSQL for Remote Access (Optional)
 
 If you need remote access:
 
@@ -287,15 +306,28 @@ CORS_ORIGIN="https://thinktap.link,https://www.thinktap.link"
 
 ### 9.3 Generate JWT Secrets
 
-```bash
-# Generate JWT Secret
-node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+**Important:** You need to run the command **TWICE** - once for JWT_SECRET and once for JWT_REFRESH_SECRET. They must be different values!
 
-# Generate Refresh Secret (run again)
+```bash
+# Generate JWT Secret (FIRST RUN)
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Copy this output - use it for JWT_SECRET
+
+# Generate Refresh Secret (SECOND RUN - run the command again!)
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Copy this output - use it for JWT_REFRESH_SECRET
 ```
 
-Copy both outputs and add them to your `.env` file.
+**Example:**
+```bash
+$ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+a1b2c3d4e5f6...  # Use this for JWT_SECRET
+
+$ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+x9y8z7w6v5u4...  # Use this for JWT_REFRESH_SECRET
+```
+
+Copy both outputs and add them to your `.env` file. **Make sure they are different values!**
 
 ### 9.4 Run Database Migrations
 
@@ -322,9 +354,28 @@ ls -la dist/
 
 ### 9.6 Start Backend with PM2
 
+**First, verify the build output location:**
 ```bash
-# Start backend with PM2
+# Check where main.js is located
+ls -la dist/
+ls -la dist/src/  # If src folder exists in dist
+
+# The main.js file might be at:
+# - dist/main.js (standard NestJS)
+# - dist/src/main.js (if src structure is preserved)
+```
+
+**Start backend with PM2:**
+
+```bash
+# Option 1: If main.js is at dist/main.js (standard)
 pm2 start dist/main.js --name thinktap-backend
+
+# Option 2: If main.js is at dist/src/main.js
+pm2 start dist/src/main.js --name thinktap-backend
+
+# Option 3: Use npm start (recommended - uses package.json)
+pm2 start npm --name thinktap-backend -- run start:prod
 
 # Save PM2 configuration
 pm2 save
@@ -340,17 +391,50 @@ pm2 status
 pm2 logs thinktap-backend
 ```
 
+**Troubleshooting:** If you get "Script not found" error, check the actual location:
+```bash
+find dist -name "main.js" -type f
+```
+Then use the correct path in the PM2 command.
+
 ---
 
 ## Step 10: Set Up Frontend
 
-### 10.1 Install Frontend Dependencies
+### 10.1 Verify Frontend Directory
+
+**First, make sure the frontend directory exists and has files:**
 
 ```bash
+# Check if frontend directory exists
+ls -la ~/thinktap/frontend/
+
+# If it doesn't exist or is empty, check project structure
+cd ~/thinktap
+ls -la
+
+# Find package.json files
+find . -name "package.json" -type f
+```
+
+**If frontend directory is missing:**
+- Check if you cloned the repository correctly
+- Verify the project structure matches the repository
+- If needed, pull the latest code: `git pull`
+
+### 10.2 Install Frontend Dependencies
+
+```bash
+# Navigate to frontend directory
 cd ~/thinktap/frontend
 
-# Install dependencies
+# Verify package.json exists
+ls -la package.json
+
+# If package.json exists, install dependencies
 npm install
+
+# If you get "package.json not found" error, see FIX_FRONTEND_SETUP.md
 ```
 
 ### 10.2 Configure Frontend Environment
