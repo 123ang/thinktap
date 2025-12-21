@@ -459,8 +459,16 @@ NEXT_PUBLIC_SOCKET_URL=https://thinktap.link
 ### 10.3 Build Frontend
 
 ```bash
+# Fix permissions (if files were copied from Windows)
+chmod +x node_modules/.bin/*
+
 # Build for production
 npm run build
+
+# If you get "Permission denied" error:
+# 1. Fix permissions: chmod +x node_modules/.bin/*
+# 2. Or reinstall: rm -rf node_modules && npm install
+# 3. See FIX_NPM_PERMISSION_DENIED.md for details
 
 # Verify build
 ls -la .next/
@@ -495,7 +503,10 @@ sudo apt install -y certbot python3-certbot-nginx
 
 ### 11.2 Obtain SSL Certificate
 
-**Important:** Make sure your domain DNS is pointing to your VPS IP first!
+**⚠️ Important:** 
+1. Make sure your domain DNS is pointing to your VPS IP first!
+2. Verify DNS: `nslookup thinktap.link` or `dig thinktap.link`
+3. Ports 80 and 443 must be open in firewall
 
 ```bash
 # Stop Nginx temporarily (Certbot needs port 80)
@@ -509,9 +520,18 @@ sudo certbot certonly --standalone -d thinktap.link -d www.thinktap.link
 # - Agree to terms
 # - Choose whether to share email (optional)
 
+# Verify certificate was created
+sudo ls -la /etc/letsencrypt/live/thinktap.link/
+# Should show: fullchain.pem, privkey.pem, cert.pem, chain.pem
+
 # Start Nginx again
 sudo systemctl start nginx
 ```
+
+**Troubleshooting:** If you get errors:
+- Check DNS is pointing correctly: `nslookup thinktap.link`
+- Check firewall allows port 80: `sudo ufw status`
+- Wait 5-30 minutes after DNS change for propagation
 
 ### 11.3 Set Up Auto-Renewal
 
@@ -570,7 +590,7 @@ server {
 
     # Frontend
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:3004;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -645,8 +665,18 @@ sudo ln -s /etc/nginx/sites-available/thinktap /etc/nginx/sites-enabled/
 # Remove default site (optional)
 sudo rm /etc/nginx/sites-enabled/default
 
+# Check for conflicting sites (if you have multiple domains)
+sudo ls -la /etc/nginx/sites-enabled/
+# If you have other sites using port 443, disable unused ones:
+# sudo rm /etc/nginx/sites-enabled/other-site
+
 # Test Nginx configuration
 sudo nginx -t
+
+# If you get SSL certificate errors:
+# 1. Check certificate exists: sudo ls -la /etc/letsencrypt/live/thinktap.link/
+# 2. If missing, get it: sudo certbot certonly --standalone -d thinktap.link -d www.thinktap.link
+# 3. See FIX_NGINX_SSL_ERROR.md for detailed troubleshooting
 
 # If test passes, reload Nginx
 sudo systemctl reload nginx
@@ -943,12 +973,12 @@ pm2 logs thinktap-frontend
 
 **Check if frontend is running:**
 ```bash
-curl http://localhost:3000
+curl http://localhost:3004
 ```
 
 **Common issues:**
 - Build errors → Check `npm run build` output
-- Port conflict → Check if port 3000 is available
+- Port conflict → Check if port 3004 is available: `lsof -i :3004` or `netstat -tulpn | grep 3004`
 
 ### Problem: 502 Bad Gateway
 

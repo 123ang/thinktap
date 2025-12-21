@@ -42,7 +42,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.ts ./
 
 # Expose port
-EXPOSE 3000
+EXPOSE 3004
 
 # Start application
 CMD ["npm", "start"]
