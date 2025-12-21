@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -44,7 +44,7 @@ type SidebarQuestion = {
   isDraft?: boolean;
 };
 
-export default function CreateSessionPage() {
+function CreateSessionPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -767,6 +767,21 @@ export default function CreateSessionPage() {
         </main>
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function CreateSessionPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center">
+        <div className="text-center">
+          <Spinner size="lg" />
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    }>
+      <CreateSessionPageContent />
+    </Suspense>
   );
 }
 
