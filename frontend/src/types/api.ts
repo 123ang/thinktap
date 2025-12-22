@@ -143,6 +143,7 @@ export interface CreateQuestionDto {
 export interface SubmitResponseDto {
   questionId: string;
   userId?: string;
+  nickname?: string;
   response: any;
   responseTimeMs: number;
 }

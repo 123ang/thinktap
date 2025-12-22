@@ -1,4 +1,4 @@
-import { IsEnum, IsString, IsNumber, IsOptional, IsArray, IsNotEmpty } from 'class-validator';
+import { IsEnum, IsString, IsNumber, IsOptional, IsArray, IsNotEmpty, ValidateIf } from 'class-validator';
 import { QuestionType } from '@prisma/client';
 
 export class CreateQuestionDto {
@@ -13,8 +13,10 @@ export class CreateQuestionDto {
   @IsOptional()
   options?: string[];
 
-  @IsNotEmpty()
-  correctAnswer: any; // Can be string, boolean, array, etc.
+  // Allow 0, null, undefined, arrays, strings, numbers - but validate it's not empty string/array
+  @ValidateIf((o) => o.correctAnswer !== null && o.correctAnswer !== undefined)
+  @IsNotEmpty({ message: 'correctAnswer cannot be empty' })
+  correctAnswer: any; // Can be string, boolean, array, number (index), etc.
 
   @IsNumber()
   @IsOptional()

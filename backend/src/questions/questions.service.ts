@@ -11,6 +11,17 @@ export class QuestionsService {
   constructor(private prismaService: PrismaService) {}
 
   async create(quizId: string, userId: string, createQuestionDto: CreateQuestionDto) {
+    console.log('[QuestionsService] Creating question with DTO:', {
+      quizId,
+      type: createQuestionDto.type,
+      question: createQuestionDto.question,
+      options: createQuestionDto.options,
+      correctAnswer: createQuestionDto.correctAnswer,
+      correctAnswerType: typeof createQuestionDto.correctAnswer,
+      timerSeconds: createQuestionDto.timerSeconds,
+      order: createQuestionDto.order,
+    });
+    
     // Verify quiz exists and user owns it
     const quiz = await this.prismaService.quiz.findUnique({
       where: { id: quizId },
@@ -24,6 +35,11 @@ export class QuestionsService {
       throw new ForbiddenException('Only the quiz owner can add questions');
     }
 
+    // Ensure correctAnswer is not null or undefined
+    if (createQuestionDto.correctAnswer === null || createQuestionDto.correctAnswer === undefined) {
+      throw new Error('correctAnswer is required and cannot be null');
+    }
+
     const question = await this.prismaService.question.create({
       data: {
         quizId,
@@ -34,6 +50,12 @@ export class QuestionsService {
         timerSeconds: createQuestionDto.timerSeconds,
         order: createQuestionDto.order,
       },
+    });
+
+    console.log('[QuestionsService] Created question:', {
+      id: question.id,
+      correctAnswer: question.correctAnswer,
+      correctAnswerType: typeof question.correctAnswer,
     });
 
     // Update quiz's updatedAt
@@ -105,6 +127,7 @@ export class QuestionsService {
   }
 
   async findOne(questionId: string) {
+    console.log('[QuestionsService] findOne called with questionId:', questionId);
     const question = await this.prismaService.question.findUnique({
       where: { id: questionId },
       include: {
@@ -121,6 +144,14 @@ export class QuestionsService {
           },
         },
       },
+    });
+
+    console.log('[QuestionsService] Question from DB:', {
+      id: question?.id,
+      question: question?.question,
+      correctAnswer: question?.correctAnswer,
+      correctAnswerType: typeof question?.correctAnswer,
+      correctAnswerJSON: JSON.stringify(question?.correctAnswer),
     });
 
     if (!question) {

@@ -38,10 +38,22 @@ export class ResponsesService {
     }
 
     if (questionType === QuestionType.TRUE_FALSE) {
+      // For TRUE_FALSE, correctAnswer is stored as index (0 or 1)
+      // userResponse is also an index from frontend
+      if (typeof userResponse === 'number' && typeof correctAnswer === 'number') {
+        return userResponse === correctAnswer;
+      }
+      // Fallback for old format (text comparison)
       return userResponse === correctAnswer;
     }
 
     if (questionType === QuestionType.MULTIPLE_CHOICE) {
+      // For MULTIPLE_CHOICE, correctAnswer is stored as index
+      // userResponse is also an index from frontend
+      if (typeof userResponse === 'number' && typeof correctAnswer === 'number') {
+        return userResponse === correctAnswer;
+      }
+      // Fallback for old format (text comparison)
       return userResponse === correctAnswer;
     }
 
@@ -49,7 +61,15 @@ export class ResponsesService {
       if (!Array.isArray(userResponse) || !Array.isArray(correctAnswer)) {
         return false;
       }
-      // Sort and compare arrays
+      // Both should be arrays of indices
+      if (userResponse.length > 0 && typeof userResponse[0] === 'number' &&
+          correctAnswer.length > 0 && typeof correctAnswer[0] === 'number') {
+        // Compare indices directly
+        const sorted1 = [...userResponse].sort((a, b) => a - b);
+        const sorted2 = [...correctAnswer].sort((a, b) => a - b);
+        return JSON.stringify(sorted1) === JSON.stringify(sorted2);
+      }
+      // Fallback for old format (text comparison)
       const sorted1 = [...userResponse].sort();
       const sorted2 = [...correctAnswer].sort();
       return JSON.stringify(sorted1) === JSON.stringify(sorted2);
@@ -112,6 +132,7 @@ export class ResponsesService {
         sessionId,
         questionId: submitResponseDto.questionId,
         userId,
+        nickname: submitResponseDto.nickname || null,
         response: submitResponseDto.response,
         isCorrect,
         responseTimeMs: submitResponseDto.responseTimeMs,
@@ -321,6 +342,191 @@ export class ResponsesService {
     }
 
     return insights;
+  }
+
+  async getParticipantStats(sessionId: string, identifier: { userId?: string; nickname?: string }) {
+    const session = await this.prismaService.session.findUnique({
+      where: { id: sessionId },
+      include: {
+        quiz: {
+          include: {
+            questions: true,
+          },
+        },
+      },
+    });
+
+    if (!session || !session.quiz) {
+      throw new NotFoundException('Session not found');
+    }
+
+    // Find all responses for this participant
+    const whereClause: any = { sessionId };
+    if (identifier.userId) {
+      whereClause.userId = identifier.userId;
+    } else if (identifier.nickname) {
+      whereClause.nickname = identifier.nickname;
+    } else {
+      throw new BadRequestException('Either userId or nickname must be provided');
+    }
+
+    const participantResponses = await this.prismaService.response.findMany({
+      where: whereClause,
+      include: {
+        question: {
+          select: {
+            id: true,
+            order: true,
+          },
+        },
+      },
+      orderBy: {
+        question: {
+          order: 'asc',
+        },
+      },
+    });
+
+    const totalQuestions = session.quiz.questions.length;
+    const totalResponses = participantResponses.length;
+    const correctCount = participantResponses.filter((r) => r.isCorrect === true).length;
+    const wrongCount = participantResponses.filter((r) => r.isCorrect === false).length;
+    const accuracy = totalResponses > 0 ? (correctCount / totalResponses) * 100 : 0;
+
+    // Calculate ranking - get all participants and their scores
+    const allResponses = await this.prismaService.response.findMany({
+      where: { sessionId },
+      select: {
+        userId: true,
+        nickname: true,
+        isCorrect: true,
+        points: true,
+      },
+    });
+
+    // Group by participant (userId or nickname)
+    const participantScores = new Map<string, { correct: number; points: number; identifier: string }>();
+    
+    allResponses.forEach((r) => {
+      const key = r.userId || r.nickname || 'unknown';
+      if (!participantScores.has(key)) {
+        participantScores.set(key, { correct: 0, points: 0, identifier: key });
+      }
+      const score = participantScores.get(key)!;
+      if (r.isCorrect) {
+        score.correct++;
+      }
+      score.points += r.points || 0;
+    });
+
+    // Sort by correct count (descending), then by points (descending)
+    const leaderboard = Array.from(participantScores.values())
+      .sort((a, b) => {
+        if (b.correct !== a.correct) {
+          return b.correct - a.correct;
+        }
+        return b.points - a.points;
+      });
+
+    // Find participant's rank
+    const participantKey = identifier.userId || identifier.nickname || '';
+    const rank = leaderboard.findIndex((entry) => entry.identifier === participantKey) + 1;
+    const totalParticipants = leaderboard.length;
+
+    return {
+      rank: rank > 0 ? rank : null,
+      totalParticipants,
+      totalQuestions,
+      totalResponses,
+      correctCount,
+      wrongCount,
+      accuracy: Math.round(accuracy * 100) / 100,
+      points: participantResponses.reduce((sum, r) => sum + (r.points || 0), 0),
+    };
+  }
+
+  async getTopRankings(sessionId: string, limit: number = 3) {
+    const session = await this.prismaService.session.findUnique({
+      where: { id: sessionId },
+      include: {
+        quiz: {
+          include: {
+            questions: true,
+          },
+        },
+      },
+    });
+
+    if (!session || !session.quiz) {
+      throw new NotFoundException('Session not found');
+    }
+
+    // Get all responses for this session
+    const allResponses = await this.prismaService.response.findMany({
+      where: { sessionId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    // Group by participant (userId or nickname)
+    const participantScores = new Map<string, {
+      identifier: string;
+      userId: string | null;
+      nickname: string | null;
+      email: string | null;
+      correct: number;
+      points: number;
+      totalAnswered: number;
+    }>();
+
+    allResponses.forEach((r) => {
+      const key = r.userId || r.nickname || 'unknown';
+      if (!participantScores.has(key)) {
+        participantScores.set(key, {
+          identifier: key,
+          userId: r.userId,
+          nickname: r.nickname,
+          email: r.user?.email || null,
+          correct: 0,
+          points: 0,
+          totalAnswered: 0,
+        });
+      }
+      const score = participantScores.get(key)!;
+      score.totalAnswered++;
+      if (r.isCorrect) {
+        score.correct++;
+      }
+      score.points += r.points || 0;
+    });
+
+    // Sort by correct count (descending), then by points (descending)
+    const leaderboard = Array.from(participantScores.values())
+      .sort((a, b) => {
+        if (b.correct !== a.correct) {
+          return b.correct - a.correct;
+        }
+        return b.points - a.points;
+      })
+      .slice(0, limit)
+      .map((entry, index) => ({
+        rank: index + 1,
+        userId: entry.userId,
+        nickname: entry.nickname,
+        email: entry.email,
+        username: entry.nickname || entry.email || `User ${entry.userId?.substring(0, 8) || 'Unknown'}`,
+        correct: entry.correct,
+        points: entry.points,
+        totalAnswered: entry.totalAnswered,
+      }));
+
+    return leaderboard;
   }
 }
 

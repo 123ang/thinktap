@@ -107,6 +107,16 @@ export const responsesApi = {
 
   getInsights: (sessionId: string) =>
     apiClient.get<SessionInsights>(`/sessions/${sessionId}/responses/insights`),
+
+  getParticipantStats: (sessionId: string, params: { userId?: string; nickname?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params.userId) queryParams.append('userId', params.userId);
+    if (params.nickname) queryParams.append('nickname', params.nickname);
+    return apiClient.get<any>(`/sessions/${sessionId}/responses/participant-stats?${queryParams.toString()}`);
+  },
+
+  getTopRankings: (sessionId: string, limit: number = 3) =>
+    apiClient.get<any[]>(`/sessions/${sessionId}/responses/top-rankings?limit=${limit}`),
 };
 
 // Analytics API

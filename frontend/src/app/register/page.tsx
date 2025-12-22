@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks';
@@ -20,8 +20,14 @@ export default function RegisterPage() {
   const router = useRouter();
 
   // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, router]);
+
+  // Don't render if already authenticated
   if (isAuthenticated) {
-    router.push('/dashboard');
     return null;
   }
 

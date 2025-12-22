@@ -31,6 +31,7 @@ interface SubmitResponsePayload {
   response: any;
   responseTimeMs: number;
   userId?: string;
+  nickname?: string;
 }
 
 interface ShowResultsPayload {
@@ -102,6 +103,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Join socket room
       await client.join(session.id);
+      console.log(`[Backend] Client ${client.id} joined session room ${session.id} (code: ${session.code}, role: ${payload.role})`);
 
       // Track participants - only count students as participants
       if (payload.role === 'student') {
@@ -169,15 +171,63 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const question = await this.questionsService.findOne(payload.questionId);
 
-      // Broadcast question to all participants (excluding correct answer)
-      this.server.to(payload.sessionId).emit('question_started', {
+      console.log(`[Backend] Starting question ${payload.questionId} for session ${payload.sessionId}`);
+      console.log(`[Backend] Question from DB:`, {
+        id: question.id,
+        correctAnswer: question.correctAnswer,
+        correctAnswerType: typeof question.correctAnswer,
+        correctAnswerValue: JSON.stringify(question.correctAnswer),
+      });
+      
+      // Get all sockets in the session room to verify who's listening
+      const room = this.server.sockets.adapter.rooms.get(payload.sessionId);
+      const socketCount = room ? room.size : 0;
+      console.log(`[Backend] Room ${payload.sessionId} has ${socketCount} socket(s)`);
+
+      // Broadcast question to ALL in session (including lecturer) - this ensures sync
+      // Prisma JSONB fields need to be properly serialized for Socket.IO
+      // Convert to plain JavaScript value to ensure proper serialization
+      let correctAnswerValue: any = null;
+      if (question.correctAnswer !== null && question.correctAnswer !== undefined) {
+        // Prisma JSONB can be number, string, array, object, or boolean
+        // For Socket.IO, we need plain JavaScript values
+        if (typeof question.correctAnswer === 'number') {
+          correctAnswerValue = Number(question.correctAnswer); // Ensure it's a plain number
+        } else if (Array.isArray(question.correctAnswer)) {
+          correctAnswerValue = [...question.correctAnswer]; // Create a new array
+        } else if (typeof question.correctAnswer === 'object') {
+          // If it's an object, stringify and parse to get plain object
+          correctAnswerValue = JSON.parse(JSON.stringify(question.correctAnswer));
+        } else {
+          correctAnswerValue = question.correctAnswer; // string, boolean, etc.
+        }
+      }
+      
+      const questionData = {
         questionId: question.id,
         question: question.question,
         type: question.type,
         options: question.options,
+        correctAnswer: correctAnswerValue, // Use the properly serialized value
         timerSeconds: question.timerSeconds,
         order: question.order,
+      };
+      
+      console.log(`[Backend] Broadcasting question_started to room ${payload.sessionId}:`, {
+        questionId: questionData.questionId,
+        correctAnswer: questionData.correctAnswer,
+        correctAnswerType: typeof questionData.correctAnswer,
+        correctAnswerValue: JSON.stringify(questionData.correctAnswer),
+        rawCorrectAnswer: question.correctAnswer,
+        rawCorrectAnswerType: typeof question.correctAnswer,
       });
+      
+      // Warn if correctAnswer is null
+      if (questionData.correctAnswer === null || questionData.correctAnswer === undefined) {
+        console.warn(`[Backend] WARNING: Question ${question.id} has no correctAnswer! Raw value:`, question.correctAnswer);
+      }
+      
+      this.server.to(payload.sessionId).emit('question_started', questionData);
 
       // Start timer if specified
       if (question.timerSeconds) {
@@ -202,6 +252,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         response: payload.response,
         responseTimeMs: payload.responseTimeMs,
         userId: payload.userId,
+        nickname: payload.nickname,
       });
 
       // Get current response count
@@ -255,9 +306,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     try {
-      // Broadcast session ended to all participants
+      // Get insights with leaderboard
+      const insights = await this.responsesService.getInsights(payload.sessionId);
+      
+      // Broadcast session ended to all participants with leaderboard data
       this.server.to(payload.sessionId).emit('session_ended', {
         message: 'Session has ended',
+        leaderboard: insights['leaderboard'] || null,
       });
 
       // Clean up

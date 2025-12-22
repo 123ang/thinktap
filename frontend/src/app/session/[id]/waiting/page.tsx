@@ -27,8 +27,18 @@ export default function WaitingForQuizPage() {
       if (!nickname || !connected || hasJoined.current) return;
       hasJoined.current = true;
       try {
-        const session = await api.sessions.getById(sessionId);
-        joinSession(session.code, nickname);
+        // Try to get session by ID first, if that fails, try using sessionId as code
+        let sessionCode: string;
+        try {
+          const session = await api.sessions.getById(sessionId);
+          sessionCode = session.code;
+        } catch (err) {
+          // If getById fails (404), the sessionId might actually be the session code
+          // This can happen if the URL uses the code instead of the ID
+          console.warn('Could not get session by ID, using sessionId as code');
+          sessionCode = sessionId;
+        }
+        joinSession(sessionCode, nickname);
       } catch (err) {
         console.error('Failed to join live session from waiting page:', err);
         hasJoined.current = false;
@@ -51,6 +61,18 @@ export default function WaitingForQuizPage() {
     socket.on('join_rejected', handler);
     return () => {
       socket.off('join_rejected', handler);
+    };
+  }, [socket, sessionId, router]);
+
+  // Redirect to participant page when question starts
+  useEffect(() => {
+    if (!socket) return;
+    const handler = () => {
+      router.replace(`/session/${sessionId}/participant`);
+    };
+    socket.on('question_started', handler);
+    return () => {
+      socket.off('question_started', handler);
     };
   }, [socket, sessionId, router]);
 

@@ -93,18 +93,30 @@ function CreateSessionPageContent() {
     ]);
   }, [searchParams, sessionId, sidebarQuestions.length]);
 
-  // If the route contains a sessionId query param, hydrate state from it and title from localStorage
+  // If the route contains a quizId query param, set it and reset loaded flag
+  // All data (title and questions) will be loaded from database in the loadExistingQuestions effect
+  // Note: We check both 'quizId' and 'sessionId' for backward compatibility
   useEffect(() => {
-    const paramId = searchParams.get('sessionId');
-    if (paramId && !sessionId) {
-      setSessionId(paramId);
-      setHasLoadedQuestions(false); // Reset flag so questions will load
-      if (typeof window !== 'undefined') {
-        const storedTitle = localStorage.getItem(`thinktap-title-${paramId}`);
-        if (storedTitle) {
-          setTitle(storedTitle);
-        }
+    const paramId = searchParams.get('quizId') || searchParams.get('sessionId');
+    console.log('[Edit Quiz] URL param check:', { paramId, currentSessionId: sessionId });
+    if (paramId) {
+      // If sessionId changed, reset the loaded flag to reload from database
+      if (paramId !== sessionId) {
+        console.log('[Edit Quiz] QuizId changed, resetting. Old:', sessionId, 'New:', paramId);
+        setSessionId(paramId);
+        setHasLoadedQuestions(false); // Reset flag so questions will load from database
+        // Clear all state to prepare for fresh data from database
+        setTitle('');
+        setSidebarQuestions([]); // Clear sidebar to prevent stale data
+        setSelectedQuestionId(null);
+        setQuestion('');
+        setOptions(['', '', '', '']);
+        setCorrectIndexes([0]);
+      } else {
+        console.log('[Edit Quiz] QuizId unchanged');
       }
+    } else {
+      console.log('[Edit Quiz] No quizId in URL');
     }
   }, [searchParams, sessionId]);
 
@@ -113,12 +125,11 @@ function CreateSessionPageContent() {
     opts: string[],
     indexes: number[],
   ) => {
-    const baseOptions = kind === 'TRUE_FALSE' ? ['True', 'False'] : opts;
+    // Return indices instead of text for storage
     if (kind === 'MC_MULTI') {
-      return indexes.map((i) => baseOptions[i]).filter((v) => v !== undefined);
+      return indexes.filter((i) => i >= 0 && i < opts.length);
     }
-    const first = indexes[0] ?? 0;
-    return baseOptions[first] ?? baseOptions[0];
+    return indexes[0] ?? 0;
   };
 
   const handleOptionChange = (index: number, value: string) => {
@@ -179,19 +190,28 @@ function CreateSessionPageContent() {
     setLoading(true);
 
     try {
-      let activeSessionId = sessionId;
-      if (!activeSessionId) {
-        const session = await api.sessions.create({ mode: SessionMode.RUSH });
-        activeSessionId = session.id;
-        setSessionId(session.id);
+      let activeQuizId = sessionId; // Note: sessionId is actually used as quizId in this context
+      if (!activeQuizId) {
+        // Create a Quiz first (not a Session)
+        const quizTitle = title.trim() || 'Untitled Quiz';
+        const quiz = await api.quizzes.create({ title: quizTitle });
+        activeQuizId = quiz.id;
+        setSessionId(quiz.id); // Using sessionId state to store quizId
         // Persist title for this quiz
-        if (typeof window !== 'undefined' && title.trim()) {
-          localStorage.setItem(`thinktap-title-${session.id}`, title);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`thinktap-title-${quiz.id}`, quizTitle);
         }
-        // Put session id into the URL so refresh can restore state
-        router.replace(`/quiz/create?sessionId=${session.id}`);
+        // Put quiz id into the URL so refresh can restore state
+        router.replace(`/session/create?sessionId=${quiz.id}`);
       } else if (typeof window !== 'undefined' && title.trim()) {
-        localStorage.setItem(`thinktap-title-${activeSessionId}`, title);
+        // Update quiz title if it changed
+        localStorage.setItem(`thinktap-title-${activeQuizId}`, title.trim());
+        // Optionally update the quiz title via API
+        try {
+          await api.quizzes.update(activeQuizId, { title: title.trim() });
+        } catch (e) {
+          console.error('Error updating quiz title:', e);
+        }
       }
 
       let type: QuestionType;
@@ -206,14 +226,45 @@ function CreateSessionPageContent() {
       const finalOptions =
         questionKind === 'TRUE_FALSE' ? ['True', 'False'] : filledOptions;
 
+      // Store indices instead of text for correctAnswer
       let correctAnswer: any;
       if (type === QuestionType.MULTIPLE_SELECT) {
-        correctAnswer = correctIndexes
-          .map((i) => finalOptions[i])
-          .filter((v) => v !== undefined);
+        correctAnswer = correctIndexes.filter((i) => i >= 0 && i < finalOptions.length);
+        // Ensure we have at least one correct answer
+        if (correctAnswer.length === 0) {
+          toast.error('Please select at least one correct answer');
+          setLoading(false);
+          return;
+        }
       } else {
-        correctAnswer = finalOptions[correctIndexes[0]] ?? finalOptions[0];
+        // For single select, ensure we have a valid index
+        const selectedIndex = correctIndexes[0];
+        if (selectedIndex === undefined || selectedIndex < 0 || selectedIndex >= finalOptions.length) {
+          toast.error('Please select a correct answer');
+          setLoading(false);
+          return;
+        }
+        correctAnswer = selectedIndex;
       }
+      
+      // Final validation: ensure correctAnswer is never null or undefined
+      if (correctAnswer === null || correctAnswer === undefined) {
+        console.error('[Create Question] ERROR: correctAnswer is null/undefined after computation!', {
+          correctAnswer,
+          correctIndexes,
+          type,
+          finalOptions,
+        });
+        toast.error('Error: No correct answer selected. Please select a correct answer.');
+        setLoading(false);
+        return;
+      }
+      
+      console.log('[Create Question] Computed correctAnswer:', {
+        value: correctAnswer,
+        type: typeof correctAnswer,
+        isArray: Array.isArray(correctAnswer),
+      });
 
       // Determine the order based on position in sidebar
       // If editing existing question, keep its position; if new draft, place at end
@@ -244,18 +295,30 @@ function CreateSessionPageContent() {
       // If editing an existing saved question, delete and replace it to simulate update
       if (selectedQuestionId && !selectedQuestionId.startsWith('draft-')) {
         try {
-          await api.questions.delete(selectedQuestionId);
+          await api.questions.delete(activeQuizId, selectedQuestionId);
         } catch (e) {
           console.error('Error deleting existing question before update:', e);
         }
       }
 
-      const created = await api.questions.create(activeSessionId, payload);
+      console.log('[Create Question] Sending payload:', payload);
+      console.log('[Create Question] correctAnswer being sent:', {
+        value: payload.correctAnswer,
+        type: typeof payload.correctAnswer,
+        isArray: Array.isArray(payload.correctAnswer),
+      });
+      const created = await api.questions.create(activeQuizId, payload);
+      console.log('[Create Question] Created question from API:', created);
+      console.log('[Create Question] correctAnswer returned:', {
+        value: created.correctAnswer,
+        type: typeof created.correctAnswer,
+      });
 
       toast.success('Question saved');
 
       // Always replace the selected question (whether draft or existing) with the saved version
       setSidebarQuestions((prev) => {
+        console.log('[Create Question] Updating sidebar. Current items:', prev.length, 'selectedQuestionId:', selectedQuestionId);
         const sidebarData: SidebarQuestion = {
           id: created.id,
           question: created.question,
@@ -264,21 +327,26 @@ function CreateSessionPageContent() {
           timerSeconds: created.timerSeconds,
           correctAnswer: created.correctAnswer,
         };
+        console.log('[Create Question] New sidebar data:', sidebarData);
 
         if (selectedQuestionId) {
           const index = prev.findIndex((q) => q.id === selectedQuestionId);
+          console.log('[Create Question] Found selectedQuestionId at index:', index);
           if (index !== -1) {
             // Replace the draft/existing question at this index
             const copy = [...prev];
             copy[index] = sidebarData;
+            console.log('[Create Question] Replaced at index', index, 'new sidebar length:', copy.length);
             return copy;
           }
         }
         // If selectedQuestionId not found (shouldn't happen), append it
+        console.log('[Create Question] Appending to sidebar. New length:', prev.length + 1);
         return [...prev, sidebarData];
       });
 
       setSelectedQuestionId(created.id);
+      console.log('[Create Question] Set selectedQuestionId to:', created.id);
     } catch (error: any) {
       console.error('Error creating ThinkTap:', error);
       const message =
@@ -345,11 +413,46 @@ function CreateSessionPageContent() {
   const [hasLoadedQuestions, setHasLoadedQuestions] = useState(false);
   useEffect(() => {
     const loadExistingQuestions = async () => {
-      if (!sessionId || hasLoadedQuestions) return;
+      console.log('[Edit Quiz] loadExistingQuestions called:', { sessionId, hasLoadedQuestions });
+      if (!sessionId || hasLoadedQuestions) {
+        console.log('[Edit Quiz] Skipping load - sessionId:', sessionId, 'hasLoadedQuestions:', hasLoadedQuestions);
+        return;
+      }
       try {
+        // Load quiz title from API
+        console.log('[Edit Quiz] Loading quiz from database, quizId:', sessionId);
+        try {
+          const quiz = await api.quizzes.getById(sessionId);
+          console.log('[Edit Quiz] Quiz loaded from database:', quiz);
+          if (quiz.title) {
+            console.log('[Edit Quiz] Setting title from database:', quiz.title);
+            setTitle(quiz.title);
+            // Also update localStorage
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`thinktap-title-${sessionId}`, quiz.title);
+            }
+          } else {
+            console.log('[Edit Quiz] Quiz has no title');
+          }
+        } catch (error) {
+          console.error('[Edit Quiz] Error loading quiz title:', error);
+          // Fallback to localStorage if API fails
+          if (typeof window !== 'undefined') {
+            const storedTitle = localStorage.getItem(`thinktap-title-${sessionId}`);
+            console.log('[Edit Quiz] Fallback to localStorage, title:', storedTitle);
+            if (storedTitle) {
+              setTitle(storedTitle);
+            }
+          }
+        }
+
+        // Load questions
+        console.log('[Edit Quiz] Loading questions from database, quizId:', sessionId);
         const existing = await api.questions.getAll(sessionId);
+        console.log('[Edit Quiz] Questions loaded from database:', existing);
         // Sort by order field to maintain correct sequence
         const sorted = [...existing].sort((a, b) => (a.order || 0) - (b.order || 0));
+        console.log('[Edit Quiz] Sorted questions:', sorted.length, 'items');
         const mapped: SidebarQuestion[] = sorted.map((q) => ({
           id: q.id,
           question: q.question,
@@ -358,16 +461,15 @@ function CreateSessionPageContent() {
           timerSeconds: q.timerSeconds,
           correctAnswer: q.correctAnswer,
         }));
-        // Preserve any draft questions when loading from API
-        const drafts = sidebarQuestions.filter(q => q.isDraft);
-        // Only update if we have questions from API, or if we have no local state yet
-        if (mapped.length > 0 || sidebarQuestions.length === 0) {
-          setSidebarQuestions([...mapped, ...drafts]);
-        }
+        console.log('[Edit Quiz] Mapped to sidebar format:', mapped);
+        // Set the sidebar with loaded questions (state was already cleared in the URL effect)
+        setSidebarQuestions(mapped);
         setHasLoadedQuestions(true);
+        console.log('[Edit Quiz] setSidebarQuestions called with', mapped.length, 'questions');
 
         if (mapped.length > 0 && !selectedQuestionId) {
           const first = mapped[0];
+          console.log('[Edit Quiz] Loading first question into editor:', first);
           setSelectedQuestionId(first.id);
           setQuestion(first.question);
           // hydrate editor from first question
@@ -384,26 +486,60 @@ function CreateSessionPageContent() {
           setTimeLimit(first.timerSeconds ?? 20);
           const opts = first.options || [];
           const answer = first.correctAnswer;
+          console.log('[Edit Quiz] First question correctAnswer:', answer, 'type:', typeof answer, 'isArray:', Array.isArray(answer));
+          // Handle both old format (text) and new format (indices)
           if (Array.isArray(answer)) {
-            setCorrectIndexes(
-              answer
+            // Check if it's already indices (numbers) or text (strings)
+            if (answer.length > 0 && typeof answer[0] === 'number') {
+              // Already indices
+              const indices = answer.filter((i: number) => i >= 0 && i < opts.length);
+              console.log('[Edit Quiz] Setting correctIndexes (array of numbers):', indices);
+              setCorrectIndexes(indices);
+            } else {
+              // Old format: convert text to indices
+              const indices = answer
                 .map((a: any) => opts.indexOf(a))
-                .filter((i: number) => i >= 0),
-            );
+                .filter((i: number) => i >= 0);
+              console.log('[Edit Quiz] Converting text answers to indices:', indices);
+              setCorrectIndexes(indices);
+            }
           } else if (answer != null) {
-            const idx = opts.indexOf(answer);
-            setCorrectIndexes([idx >= 0 ? idx : 0]);
+            if (typeof answer === 'number') {
+              // Already an index
+              const idx = answer >= 0 && answer < opts.length ? answer : 0;
+              console.log('[Edit Quiz] Setting correctIndexes (single number):', [idx]);
+              setCorrectIndexes([idx]);
+            } else {
+              // Old format: convert text to index
+              const idx = opts.indexOf(answer);
+              const finalIdx = idx >= 0 ? idx : 0;
+              console.log('[Edit Quiz] Converting text answer to index:', finalIdx);
+              setCorrectIndexes([finalIdx]);
+            }
           } else {
-            setCorrectIndexes([0]);
+            console.log('[Edit Quiz] No correctAnswer found in database, defaulting to index 0 (Option A)');
+            console.warn('[Edit Quiz] WARNING: Question has no correct answer! Please select one and save.');
+            setCorrectIndexes([0]); // Default to first option
+            // Show a warning toast to the user
+            if (typeof window !== 'undefined') {
+              setTimeout(() => {
+                toast.warning('This question has no correct answer set. Please select the correct answer and save.');
+              }, 500);
+            }
           }
+          console.log('[Edit Quiz] Editor hydrated with first question data');
+        } else {
+          console.log('[Edit Quiz] Not loading first question - mapped.length:', mapped.length, 'selectedQuestionId:', selectedQuestionId);
         }
       } catch (error) {
-        console.error('Error loading existing questions:', error);
+        console.error('[Edit Quiz] Error loading existing questions:', error);
+        console.error('[Edit Quiz] Error details:', error instanceof Error ? error.message : error);
       }
     };
 
     void loadExistingQuestions();
-  }, [sessionId, hasLoadedQuestions, sidebarQuestions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, hasLoadedQuestions]);
 
   return (
     <ProtectedRoute>

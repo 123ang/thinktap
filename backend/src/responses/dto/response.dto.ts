@@ -14,5 +14,9 @@ export class SubmitResponseDto {
   @IsString()
   @IsOptional()
   userId?: string; // Optional for anonymous responses
+
+  @IsString()
+  @IsOptional()
+  nickname?: string; // Student's nickname for anonymous play
 }
 

@@ -7,41 +7,65 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import api from '@/lib/api';
-import { Session } from '@/types/api';
+import { Session, Quiz, SessionMode } from '@/types/api';
 
 export default function HostLobbyPage() {
   const params = useParams();
   const router = useRouter();
-  const sessionId = params.id as string;
+  const quizId = params.id as string;
 
   const [session, setSession] = useState<Session | null>(null);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await api.sessions.getById(sessionId);
-        setSession(data);
+        // Load quiz first
+        const quizData = await api.quizzes.getById(quizId);
+        setQuiz(quizData);
+        setTitle(quizData.title);
+
+        // Check if there's an existing active session for this quiz
+        const sessions = await api.sessions.getAll();
+        const existingSession = sessions.find(
+          (s) => s.quizId === quizId && s.status !== 'ENDED'
+        );
+
+        if (existingSession) {
+          setSession(existingSession);
+        } else {
+          // Create a new session for this quiz
+          const newSession = await api.sessions.create({
+            quizId: quizId,
+            mode: SessionMode.RUSH,
+          });
+          setSession(newSession);
+        }
+      } catch (error: any) {
+        console.error('Error loading quiz/session:', error);
       } finally {
         setLoading(false);
       }
     };
     void load();
-  }, [sessionId]);
+  }, [quizId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const storedTitle = localStorage.getItem(`thinktap-title-${sessionId}`);
+    const storedTitle = localStorage.getItem(`thinktap-title-${quizId}`);
     if (storedTitle) setTitle(storedTitle);
-  }, [sessionId]);
+  }, [quizId]);
 
   const handleStart = () => {
-    // Host proceeds to the full live control page
-    router.push(`/session/${sessionId}`);
+    if (session) {
+      // Host proceeds to the full live control page
+      router.push(`/session/${session.id}`);
+    }
   };
 
-  if (loading || !session) {
+  if (loading || !session || !quiz) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
         <Spinner size="lg" />

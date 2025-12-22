@@ -19,9 +19,11 @@ import {
   Square, 
   BarChart,
   Copy,
-  CheckCircle
+  CheckCircle,
+  Clock
 } from 'lucide-react';
 import Link from 'next/link';
+import { Podium } from '@/components/Podium';
 import {
   Dialog,
   DialogContent,
@@ -47,8 +49,11 @@ export default function LecturerSessionPage() {
   const [showAddQuestion, setShowAddQuestion] = useState(false);
   const [quizTitle, setQuizTitle] = useState<string | null>(null);
   const [joinUrl, setJoinUrl] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [showPodium, setShowPodium] = useState(false);
+  const [topRankings, setTopRankings] = useState<any[]>([]);
   
-  const { questions, createQuestion, refresh: refreshQuestions } = useQuestions(sessionId);
   const {
     connected,
     participantCount,
@@ -61,9 +66,39 @@ export default function LecturerSessionPage() {
     endSession,
   } = useSocket({ sessionCode: session?.code, role: 'lecturer' });
 
+  // Debug: Log when results change
+  useEffect(() => {
+    console.log('[Lecturer] Results state changed:', results);
+  }, [results]);
+
   useEffect(() => {
     loadSession();
   }, [sessionId]);
+
+  // Ensure lecturer joins the session room when session loads
+  useEffect(() => {
+    if (session?.code && connected) {
+      // Lecturer should join the session room to receive events
+      // The useSocket hook will auto-join, but we can also verify it here
+      console.log('[Lecturer] Session loaded, should be in room:', session.id);
+    }
+  }, [session, connected]);
+
+  // Listen for question started confirmation to show toast
+  useEffect(() => {
+    const handleQuestionStarted = () => {
+      toast.success('Question started!');
+    };
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('question_started_confirmed', handleQuestionStarted);
+      return () => {
+        window.removeEventListener('question_started_confirmed', handleQuestionStarted);
+      };
+    }
+  }, []);
+
+  // Removed auto-start - lecturer must manually start questions
 
   // Load quiz title from localStorage (saved in builder) so host-live screen can show it
   useEffect(() => {
@@ -81,12 +116,30 @@ export default function LecturerSessionPage() {
     try {
       const data = await api.sessions.getById(sessionId);
       setSession(data);
+      
+      // Load questions from the quiz
+      if (data.quizId) {
+        await loadQuestions(data.quizId);
+      }
     } catch (error) {
       console.error('Error loading session:', error);
       toast.error('Failed to load session');
       router.push('/dashboard');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadQuestions = async (quizId: string) => {
+    setQuestionsLoading(true);
+    try {
+      const data = await api.questions.getAll(quizId);
+      setQuestions(data);
+    } catch (error) {
+      console.error('Error loading questions:', error);
+      toast.error('Failed to load questions');
+    } finally {
+      setQuestionsLoading(false);
     }
   };
 
@@ -104,6 +157,7 @@ export default function LecturerSessionPage() {
       await api.sessions.updateStatus(sessionId, 'ACTIVE');
       await loadSession();
       toast.success('Session started!');
+      // First question will auto-start via useEffect
     } catch (error) {
       toast.error('Failed to start session');
     }
@@ -112,23 +166,84 @@ export default function LecturerSessionPage() {
   const handleEndSession = async () => {
     try {
       await api.sessions.updateStatus(sessionId, 'ENDED');
-      endSession();
-      toast.success('Session ended');
-      router.push('/dashboard');
+      endSession(sessionId);
+      
+      // Fetch top 3 rankings
+      try {
+        const rankings = await api.responses.getTopRankings(sessionId, 3);
+        console.log('Top rankings received:', rankings);
+        setTopRankings(rankings);
+        setShowPodium(true);
+      } catch (error: any) {
+        console.error('Error fetching rankings:', error);
+        console.error('Error details:', {
+          message: error.message,
+          status: error.response?.status,
+          url: error.config?.url,
+          baseURL: error.config?.baseURL,
+        });
+        // Still show podium even if rankings fail, but with empty rankings
+        setTopRankings([]);
+        setShowPodium(true);
+        toast.warning('Could not load rankings, but session ended successfully');
+      }
     } catch (error) {
       console.error('Error ending session:', error);
       toast.error('Failed to end session');
     }
   };
 
+  const handleBackToDashboard = () => {
+    router.push('/dashboard');
+  };
+
   const handleStartQuestion = (questionId: string) => {
+    if (!connected) {
+      toast.error('Not connected. Please wait...');
+      return;
+    }
+    // Emit to backend - state will be updated via socket event
     startQuestion(sessionId, questionId);
-    toast.success('Question started!');
+    // Toast will be shown when socket event confirms question started
   };
 
   const handleShowResults = (questionId: string) => {
+    console.log('[Lecturer] Showing results for question:', questionId);
     showResults(sessionId, questionId);
   };
+
+  // Show podium when session ends
+  if (showPodium) {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gradient-to-br from-rose-500 via-orange-400 to-amber-300 flex items-center justify-center p-4">
+          <div className="w-full max-w-5xl space-y-6">
+            <Card className="bg-white/95 backdrop-blur shadow-2xl">
+              <CardHeader className="text-center pb-4">
+                <CardTitle className="text-4xl font-bold mb-2">Session Complete!</CardTitle>
+                <CardDescription className="text-xl">Top 3 Performers</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {topRankings.length > 0 ? (
+                  <Podium rankings={topRankings} />
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    No rankings available yet
+                  </div>
+                )}
+                <div className="mt-8 text-center">
+                  <Button onClick={handleBackToDashboard} size="lg" className="px-8">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Dashboard
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
 
   if (loading) {
     return (
@@ -237,9 +352,136 @@ export default function LecturerSessionPage() {
             )}
           </div>
 
-          {/* Lobby view: show while no question is currently active */}
-          {!currentQuestion ? (
+          {/* Full-screen question view when active */}
+          {currentQuestion ? (
+            <div className="fixed inset-0 bg-gradient-to-br from-rose-500 via-orange-400 to-amber-300 z-50 flex flex-col items-center justify-center p-4 overflow-auto">
+              <div className="w-full max-w-4xl space-y-4 py-4">
+                {/* Timer */}
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center gap-3 px-6 py-3 bg-white/20 backdrop-blur rounded-full">
+                    <Clock className="h-6 w-6 text-white" />
+                    <span className="text-4xl font-bold text-white">
+                      {timeRemaining !== null ? `${timeRemaining}s` : '0s'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Question */}
+                <Card className="bg-white/95 backdrop-blur shadow-2xl">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-2xl text-center">{currentQuestion.question}</CardTitle>
+                    <CardDescription className="text-center">
+                      {currentQuestion.type.replace(/_/g, ' ')}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {currentQuestion.options?.map((option, index) => {
+                        const letter = String.fromCharCode(65 + index); // A, B, C, D...
+                        return (
+                          <div
+                            key={index}
+                            className="p-4 border-2 border-gray-200 rounded-xl hover:border-rose-400 hover:bg-rose-50 transition-all"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-rose-600 text-white flex items-center justify-center font-bold">
+                                {letter}
+                              </div>
+                              <span className="flex-1">{option}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Next Button - Show when timer reaches 0 */}
+                {timeRemaining === 0 && (
+                  <div className="text-center">
+                    <Button
+                      size="lg"
+                      onClick={async () => {
+                        // Show results first if not already shown
+                        if (!results) {
+                          await handleShowResults(currentQuestion.id);
+                          return;
+                        }
+                        
+                        // Find next question
+                        const currentIndex = questions.findIndex(q => q.id === currentQuestion.id);
+                        const nextQuestion = questions[currentIndex + 1];
+                        if (nextQuestion) {
+                          handleStartQuestion(nextQuestion.id);
+                        } else {
+                          // No more questions, end session
+                          await handleEndSession();
+                        }
+                      }}
+                      className="bg-white text-rose-600 hover:bg-rose-50 text-lg px-8 py-4 h-auto"
+                    >
+                      {!results 
+                        ? 'Show Results'
+                        : questions.findIndex(q => q.id === currentQuestion.id) < questions.length - 1
+                        ? 'Next Question'
+                        : 'Finish Session'}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Stats - Show when results are available */}
+                {results && (
+                  <Card className="bg-white/95 backdrop-blur shadow-2xl">
+                    <CardHeader>
+                      <CardTitle className="text-xl text-center">Results</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                          <p className="text-3xl font-bold text-rose-600">{results.totalResponses || 0}</p>
+                          <p className="text-sm text-muted-foreground mt-1">Total Responses</p>
+                        </div>
+                        <div>
+                          <p className="text-3xl font-bold text-green-600">{results.correctResponses || 0}</p>
+                          <p className="text-sm text-muted-foreground mt-1">Correct</p>
+                        </div>
+                        <div>
+                          <p className="text-3xl font-bold text-blue-600">{Math.round(results.correctnessRate || 0)}%</p>
+                          <p className="text-sm text-muted-foreground mt-1">Accuracy</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+          ) : (
             <div className="flex flex-col items-center justify-center py-10 gap-8">
+              {session.status === 'ACTIVE' && questions.length > 0 ? (
+                <>
+                  <div className="px-6 py-3 rounded-full bg-emerald-600 text-emerald-50 text-sm font-medium shadow">
+                    Ready to start
+                  </div>
+                  <div className="flex flex-col items-center gap-4">
+                    <p className="text-lg text-gray-700">
+                      {questions.length} {questions.length === 1 ? 'question' : 'questions'} ready
+                    </p>
+                    {!connected && (
+                      <p className="text-sm text-amber-600">Connecting to session...</p>
+                    )}
+                    <Button
+                      onClick={() => handleStartQuestion(questions[0].id)}
+                      disabled={!connected || questionsLoading}
+                      size="lg"
+                      className="bg-gradient-to-r from-rose-600 to-orange-500 hover:from-rose-700 hover:to-orange-600 text-white px-8 py-6 text-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Play className="mr-2 h-5 w-5" />
+                      {questionsLoading ? 'Loading questions...' : 'Start First Question'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
               <div className="px-6 py-3 rounded-full bg-rose-600 text-rose-50 text-sm font-medium shadow">
                 Waiting for participants
               </div>
@@ -251,6 +493,8 @@ export default function LecturerSessionPage() {
                   {participantCount === 1 ? 'participant joined' : 'participants joined'}
                 </p>
               </div>
+                </>
+              )}
               {participantNames && participantNames.length > 0 && (
                 <div className="mt-6 grid grid-cols-6 gap-4">
                   {participantNames.map((name, index) => (
@@ -263,196 +507,6 @@ export default function LecturerSessionPage() {
                   ))}
                 </div>
               )}
-            </div>
-          ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - Session Info */}
-            <div className="space-y-6">
-              {/* Session Code Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Session Code</CardTitle>
-                  <CardDescription>Share this code with participants</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 text-center py-4 bg-red-50 rounded-lg">
-                      <p className="text-4xl font-mono font-bold text-red-600">
-                        {session.code}
-                      </p>
-                    </div>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={handleCopyCode}
-                    >
-                      {codeCopied ? (
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Participants Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Participants
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center">
-                    <p className="text-5xl font-bold text-red-600">{participantCount}</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      {participantCount === 1 ? 'participant' : 'participants'} joined
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Current Question Status */}
-              {currentQuestion && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Active Question</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="font-medium mb-2">{currentQuestion.question}</p>
-                    {timeRemaining !== null && (
-                      <div className="text-center py-4 bg-orange-50 rounded-lg">
-                        <p className="text-3xl font-bold text-orange-600">
-                          {timeRemaining}s
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Right Column - Questions */}
-            <div className="lg:col-span-2">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>Questions</CardTitle>
-                    <CardDescription>
-                      {questions.length} question{questions.length !== 1 ? 's' : ''} added
-                    </CardDescription>
-                  </div>
-                  <QuickAddQuestionDialog 
-                    sessionId={sessionId}
-                    onQuestionAdded={refreshQuestions}
-                  />
-                </CardHeader>
-                <CardContent>
-                  {questions.length === 0 ? (
-                    <div className="text-center py-12">
-                      <p className="text-muted-foreground mb-4">No questions yet</p>
-                      <p className="text-sm text-muted-foreground mb-6">
-                        Add your first question to get started
-                      </p>
-                      <QuickAddQuestionDialog 
-                        sessionId={sessionId}
-                        onQuestionAdded={refreshQuestions}
-                        trigger={
-                          <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add First Question
-                          </Button>
-                        }
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {questions.map((question, index) => (
-                        <div
-                          key={question.id}
-                          className="border rounded-lg p-4 hover:bg-gray-50"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-sm font-medium text-muted-foreground">
-                                  Q{index + 1}
-                                </span>
-                                <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                                  {question.type.replace(/_/g, ' ')}
-                                </span>
-                              </div>
-                              <p className="font-medium mb-2">{question.question}</p>
-                              {question.options && (
-                                <div className="text-sm text-muted-foreground">
-                                  {question.options.length} options
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex gap-2">
-                              {session.status === 'ACTIVE' && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleStartQuestion(question.id)}
-                                    disabled={currentQuestion?.id === question.id}
-                                  >
-                                    <Play className="mr-2 h-4 w-4" />
-                                    Start
-                                  </Button>
-                                  {currentQuestion?.id === question.id && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleShowResults(question.id)}
-                                    >
-                                      Show Results
-                                    </Button>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Results Display */}
-              {results && (
-                <Card className="mt-6">
-                  <CardHeader>
-                    <CardTitle>Results</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="text-center">
-                          <p className="text-2xl font-bold">{results.totalResponses}</p>
-                          <p className="text-sm text-muted-foreground">Responses</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-2xl font-bold text-green-600">
-                            {results.correctResponses}
-                          </p>
-                          <p className="text-sm text-muted-foreground">Correct</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-2xl font-bold">
-                            {Math.round(results.correctnessRate)}%
-                          </p>
-                          <p className="text-sm text-muted-foreground">Accuracy</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
           </div>
           )}
         </div>

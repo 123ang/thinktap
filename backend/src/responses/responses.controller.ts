@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ResponsesService } from './responses.service';
@@ -32,6 +33,24 @@ export class ResponsesController {
   @UseGuards(JwtAuthGuard)
   async getInsights(@Param('sessionId') sessionId: string) {
     return this.responsesService.getInsights(sessionId);
+  }
+
+  @Get('participant-stats')
+  async getParticipantStats(
+    @Param('sessionId') sessionId: string,
+    @Query('userId') userId?: string,
+    @Query('nickname') nickname?: string,
+  ) {
+    return this.responsesService.getParticipantStats(sessionId, { userId, nickname });
+  }
+
+  @Get('top-rankings')
+  @UseGuards(JwtAuthGuard)
+  async getTopRankings(
+    @Param('sessionId') sessionId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.responsesService.getTopRankings(sessionId, limit ? parseInt(limit) : 3);
   }
 }
 
