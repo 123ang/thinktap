@@ -58,9 +58,16 @@ export const useSocket = (options: UseSocketOptions = {}) => {
       // Session events
       // Backend sends aggregate participant counts and names via "participant_count"
       socket.on('participant_count', (data: { count: number; names?: string[] }) => {
-        console.log('Participant count updated:', data.count, data.names);
-        setParticipantCount(data.count);
-        setParticipantNames(data.names || []);
+        // Filter out any entries that look like internal IDs/UUIDs (lecturer user IDs)
+        const allNames = data.names || [];
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const filteredNames = allNames.filter((name) => !uuidRegex.test(name));
+
+        console.log('Participant count updated (filtered):', filteredNames.length, filteredNames);
+
+        // Use filtered length as the source of truth for participant count on the frontend
+        setParticipantCount(filteredNames.length);
+        setParticipantNames(filteredNames);
       });
 
       const handleQuestionStarted = (data: any) => {

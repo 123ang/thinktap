@@ -12,7 +12,7 @@ export default function WaitingForQuizPage() {
 
   const router = useRouter();
   const [nickname, setNickname] = useState<string | null>(null);
-  const { socket, connected } = useSocket({ autoConnect: true });
+  const { socket, connected, currentQuestion } = useSocket({ autoConnect: true });
   const hasJoined = useRef(false);
 
   useEffect(() => {
@@ -20,6 +20,13 @@ export default function WaitingForQuizPage() {
     const stored = localStorage.getItem(`thinktap-nickname-${sessionId}`);
     setNickname(stored || '');
   }, [sessionId]);
+
+  // If a question is already active when we load, skip waiting and go straight to participant view
+  useEffect(() => {
+    if (currentQuestion) {
+      router.replace(`/session/${sessionId}/participant`);
+    }
+  }, [currentQuestion, router, sessionId]);
 
   // Join session via HTTP endpoint when nickname and socket are ready
   useEffect(() => {

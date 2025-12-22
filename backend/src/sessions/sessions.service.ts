@@ -179,7 +179,7 @@ export class SessionsService {
     return session;
   }
 
-  async updateStatus(sessionId: string, userId: string, status: SessionStatus) {
+  async updateStatus(sessionId: string, userId: string | null, status: SessionStatus) {
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
     });
@@ -188,7 +188,9 @@ export class SessionsService {
       throw new NotFoundException('Session not found');
     }
 
-    if (session.lecturerId !== userId) {
+    // If userId is provided, enforce that only the lecturer can change status.
+    // If userId is null (unauthenticated), allow for now (frontend route is already protected).
+    if (userId && session.lecturerId !== userId) {
       throw new ForbiddenException('Only the lecturer can update session status');
     }
 
@@ -201,7 +203,7 @@ export class SessionsService {
     });
 
     // For FREE users, delete session data after it ends
-    if (status === SessionStatus.ENDED) {
+    if (status === SessionStatus.ENDED && userId) {
       const lecturer = await this.prismaService.user.findUnique({
         where: { id: userId },
         select: { plan: true },

@@ -103,24 +103,32 @@ export class SessionStateService {
       3600,
     );
 
-    // Update participant count
-    const count = await this.redis.scard(this.getParticipantsKey(sessionId));
+    // Update participant count (only count students, exclude lecturers)
+    const participants = await this.getParticipants(sessionId);
+    const studentCount = await this.getStudentCount(sessionId);
     const state = await this.getSessionState(sessionId);
     if (state) {
-      // Get all participant names
-      const participants = await this.getParticipants(sessionId);
-      const names: string[] = [];
+      // Get all participant names (only students, exclude UUIDs, deduplicate by nickname)
+      const namesSet = new Set<string>(); // Use Set to automatically deduplicate
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       for (const pid of participants) {
         const info = await this.getParticipant(sessionId, pid);
-        if (info?.nickname) {
-          names.push(info.nickname);
-        } else if (info?.userId) {
-          names.push(info.userId);
+        // Only include students in names, and exclude UUIDs
+        if (info?.role === 'student') {
+          if (info?.nickname && !uuidRegex.test(info.nickname)) {
+            namesSet.add(info.nickname); // Set automatically handles duplicates
+          } else if (info?.userId && !uuidRegex.test(info.userId)) {
+            // Only add userId if it's not a UUID (shouldn't happen for students with nicknames)
+            namesSet.add(info.userId);
+          }
         }
       }
 
+      // Convert Set to array for storage
+      const names = Array.from(namesSet);
+
       await this.updateSessionState(sessionId, {
-        participantCount: count,
+        participantCount: names.length, // Use unique names count instead of studentCount
         participantNames: names,
       });
     }
@@ -130,23 +138,26 @@ export class SessionStateService {
     await this.redis.srem(this.getParticipantsKey(sessionId), socketId);
     await this.redis.del(this.getParticipantKey(sessionId, socketId));
 
-    // Update participant count
-    const count = await this.redis.scard(this.getParticipantsKey(sessionId));
+    // Update participant count (only count students, exclude lecturers)
+    const studentCount = await this.getStudentCount(sessionId);
     const state = await this.getSessionState(sessionId);
     if (state) {
       const participants = await this.getParticipants(sessionId);
       const names: string[] = [];
       for (const pid of participants) {
         const info = await this.getParticipant(sessionId, pid);
-        if (info?.nickname) {
-          names.push(info.nickname);
-        } else if (info?.userId) {
-          names.push(info.userId);
+        // Only include students in names
+        if (info?.role === 'student') {
+          if (info?.nickname) {
+            names.push(info.nickname);
+          } else if (info?.userId) {
+            names.push(info.userId);
+          }
         }
       }
 
       await this.updateSessionState(sessionId, {
-        participantCount: count,
+        participantCount: studentCount,
         participantNames: names,
       });
     }
@@ -163,7 +174,20 @@ export class SessionStateService {
   }
 
   async getParticipantCount(sessionId: string): Promise<number> {
-    return this.redis.scard(this.getParticipantsKey(sessionId));
+    return this.getStudentCount(sessionId);
+  }
+
+  // Get count of students only (exclude lecturers)
+  async getStudentCount(sessionId: string): Promise<number> {
+    const participants = await this.getParticipants(sessionId);
+    let studentCount = 0;
+    for (const pid of participants) {
+      const info = await this.getParticipant(sessionId, pid);
+      if (info?.role === 'student') {
+        studentCount++;
+      }
+    }
+    return studentCount;
   }
 
   // Question/Timer Management

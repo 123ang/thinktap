@@ -233,8 +233,8 @@ export default function ParticipantSessionPage() {
     } else {
       // Submit index directly (number) instead of converting to text
       if (response === null || response === undefined) {
-        toast.error('Please select an answer');
-        return;
+      toast.error('Please select an answer');
+      return;
       }
       finalResponse = response; // Submit the index (number) directly
     }
@@ -253,12 +253,12 @@ export default function ParticipantSessionPage() {
       await api.responses.submit(sessionId, {
         questionId: currentQuestion.id,
         response: finalResponse, // Sending index(es) instead of text
-        responseTimeMs,
+      responseTimeMs,
         nickname: nickname || undefined,
-      });
+    });
 
-      setResponseSubmitted(true);
-      toast.success('Response submitted!');
+    setResponseSubmitted(true);
+    toast.success('Response submitted!');
     } catch (error: any) {
       console.error('[Participant] Failed to submit response:', error);
       toast.error(error?.response?.data?.message || 'Failed to submit response');
@@ -313,12 +313,12 @@ export default function ParticipantSessionPage() {
               <div key={index} className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-gray-50">
                 <Checkbox
                   id={`option-${index}`}
-                  checked={multiSelectResponse.includes(option)}
+                  checked={multiSelectResponse.includes(index)}
                   onCheckedChange={(checked) => {
                     if (checked) {
-                      setMultiSelectResponse([...multiSelectResponse, option]);
+                      setMultiSelectResponse([...multiSelectResponse, index]);
                     } else {
-                      setMultiSelectResponse(multiSelectResponse.filter(o => o !== option));
+                      setMultiSelectResponse(multiSelectResponse.filter(i => i !== index));
                     }
                   }}
                 />
@@ -451,14 +451,14 @@ export default function ParticipantSessionPage() {
 
           {/* Question */}
           <Card className="bg-white/95 backdrop-blur shadow-2xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-2xl text-center">{currentQuestion.question}</CardTitle>
-              <CardDescription className="text-center">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xl text-center">{currentQuestion.question}</CardTitle>
+              <CardDescription className="text-center text-sm">
                 {currentQuestion.type.replace(/_/g, ' ')}
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="pt-2">
+              <div className="space-y-2">
                 {currentQuestion.options?.map((option, index) => {
                   const letter = String.fromCharCode(65 + index); // A, B, C, D...
                   
@@ -555,7 +555,7 @@ export default function ParticipantSessionPage() {
                         }
                       }}
                       disabled={responseSubmitted || timeRemaining === 0}
-                      className={`w-full p-4 border-2 rounded-xl transition-all text-left ${
+                      className={`w-full p-3 border-2 rounded-lg transition-all text-left ${
                         userAnswerCorrect
                           ? 'border-green-500 bg-green-100 shadow-lg'
                           : userAnswerWrong
@@ -567,8 +567,8 @@ export default function ParticipantSessionPage() {
                           : 'border-gray-200 bg-white hover:border-rose-400 hover:bg-rose-50'
                       } ${responseSubmitted || timeRemaining === 0 ? 'opacity-75 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                      <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
                           userAnswerCorrect
                             ? 'bg-green-600 text-white'
                             : userAnswerWrong
@@ -581,7 +581,7 @@ export default function ParticipantSessionPage() {
                         }`}>
                           {letter}
                         </div>
-                        <span className="flex-1">{option}</span>
+                        <span className="flex-1 text-sm">{option}</span>
                         {/* Show correct answer tick when timer ends or results shown */}
                         {showAnswer && isCorrectAnswer && (
                           <div className="flex items-center gap-2">

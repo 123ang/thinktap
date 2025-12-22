@@ -103,7 +103,7 @@ function CreateSessionPageContent() {
       // If sessionId changed, reset the loaded flag to reload from database
       if (paramId !== sessionId) {
         console.log('[Edit Quiz] QuizId changed, resetting. Old:', sessionId, 'New:', paramId);
-        setSessionId(paramId);
+      setSessionId(paramId);
         setHasLoadedQuestions(false); // Reset flag so questions will load from database
         // Clear all state to prepare for fresh data from database
         setTitle('');
@@ -511,7 +511,7 @@ function CreateSessionPageContent() {
               setCorrectIndexes([idx]);
             } else {
               // Old format: convert text to index
-              const idx = opts.indexOf(answer);
+            const idx = opts.indexOf(answer);
               const finalIdx = idx >= 0 ? idx : 0;
               console.log('[Edit Quiz] Converting text answer to index:', finalIdx);
               setCorrectIndexes([finalIdx]);

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import Link from 'next/link';
 import { Quiz, Session } from '@/types/api';
-import { Plus, Users, Clock, BarChart, History } from 'lucide-react';
+import { Plus, Users, Clock, BarChart } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -258,12 +258,6 @@ export default function DashboardPage() {
                           <Link href={`/quiz/create?quizId=${quiz.id}`}>
                             <Button size="sm" variant="outline">
                               Edit
-                            </Button>
-                          </Link>
-                          <Link href={`/quiz/${quiz.id}/history`}>
-                            <Button size="sm" variant="outline">
-                              <History className="mr-2 h-4 w-4" />
-                              History
                             </Button>
                           </Link>
                           <Button

@@ -53,6 +53,8 @@ export default function LecturerSessionPage() {
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [showPodium, setShowPodium] = useState(false);
   const [topRankings, setTopRankings] = useState<any[]>([]);
+  const [preCountdown, setPreCountdown] = useState<number | null>(null);
+  const [pendingQuestionId, setPendingQuestionId] = useState<string | null>(null);
   
   const {
     connected,
@@ -220,9 +222,31 @@ export default function LecturerSessionPage() {
       toast.error('Not connected. Please wait...');
       return;
     }
-    // Emit to backend - state will be updated via socket event
+
+    // If this is the first question (no currentQuestion yet), show a 5-second countdown
+    if (!currentQuestion && preCountdown === null) {
+      setPendingQuestionId(questionId);
+      setPreCountdown(5);
+
+      let remaining = 5;
+      const interval = setInterval(() => {
+        remaining -= 1;
+        setPreCountdown(remaining);
+
+        if (remaining <= 0) {
+          clearInterval(interval);
+          setPreCountdown(null);
+          setPendingQuestionId(null);
+          // Emit to backend - state will be updated via socket event
+          startQuestion(sessionId, questionId);
+        }
+      }, 1000);
+
+      return;
+    }
+
+    // For subsequent questions, start immediately
     startQuestion(sessionId, questionId);
-    // Toast will be shown when socket event confirms question started
   };
 
   const handleShowResults = (questionId: string) => {
@@ -484,12 +508,17 @@ export default function LecturerSessionPage() {
                     <p className="text-lg text-gray-700">
                       {questions.length} {questions.length === 1 ? 'question' : 'questions'} ready
                     </p>
+                    {preCountdown !== null && !currentQuestion && (
+                      <p className="text-3xl font-bold text-rose-700">
+                        Starting in {preCountdown}...
+                      </p>
+                    )}
                     {!connected && (
                       <p className="text-sm text-amber-600">Connecting to session...</p>
                     )}
                     <Button
                       onClick={() => handleStartQuestion(questions[0].id)}
-                      disabled={!connected || questionsLoading}
+                      disabled={!connected || questionsLoading || preCountdown !== null}
                       size="lg"
                       className="bg-gradient-to-r from-rose-600 to-orange-500 hover:from-rose-700 hover:to-orange-600 text-white px-8 py-6 text-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -514,11 +543,14 @@ export default function LecturerSessionPage() {
                 </>
               )}
               {participantNames && participantNames.length > 0 && (
-                <div className="mt-6 grid grid-cols-6 gap-4">
-                  {participantNames.map((name, index) => (
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {participantNames
+                    // Filter out entries that look like internal IDs (e.g. lecturer user IDs / UUIDs)
+                    .filter((name) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(name))
+                    .map((name, index) => (
                     <div
                       key={`${name}-${index}`}
-                      className="w-[250px] min-h-[50px] rounded-xl bg-white/95 border border-rose-100 shadow flex items-center justify-center px-3 py-2 text-sm font-semibold text-rose-800 text-center break-words"
+                        className="min-h-[56px] rounded-xl bg-white/95 border border-rose-100 shadow flex items-center justify-center px-4 py-3 text-sm font-semibold text-rose-800 text-center break-words"
                     >
                       {name}
                     </div>
