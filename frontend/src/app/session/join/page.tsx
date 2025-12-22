@@ -27,13 +27,13 @@ export default function JoinSessionPage() {
       toast.error('Please enter a valid 6-digit code');
       return;
     }
-
     setLoading(true);
 
     try {
       const session = await api.sessions.getByCode(code);
-      toast.success('Joined session successfully!');
-      router.push(`/session/${session.id}/participant`);
+      toast.success('Session found! Enter your nickname to join.');
+      // After validating the PIN, send the user to the nickname page
+      router.push(`/session/${session.id}/join`);
     } catch (error: any) {
       console.error('Error joining session:', error);
       const errorMessage = error.response?.data?.message || 'Invalid session code';

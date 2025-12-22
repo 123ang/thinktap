@@ -10,6 +10,8 @@ import { QuestionsModule } from './questions/questions.module';
 import { ResponsesModule } from './responses/responses.module';
 import { EventsModule } from './events/events.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { RedisModule } from './redis/redis.module';
+import { SessionStateModule } from './session-state/session-state.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { AnalyticsModule } from './analytics/analytics.module';
       isGlobal: true,
     }),
     PrismaModule,
+    RedisModule,
+    SessionStateModule,
     AuthModule,
     QuizzesModule,
     SessionsModule,

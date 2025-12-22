@@ -7,10 +7,14 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSessionDto } from './dto/session.dto';
 import { Plan, SessionStatus } from '@prisma/client';
+import { SessionStateService } from '../session-state/session-state.service';
 
 @Injectable()
 export class SessionsService {
-  constructor(private prismaService: PrismaService) {}
+  constructor(
+    private prismaService: PrismaService,
+    private sessionStateService: SessionStateService,
+  ) {}
 
   private generateSessionCode(): string {
     // Generate a random 6-digit numeric code
@@ -230,7 +234,75 @@ export class SessionsService {
       where: { id: sessionId },
     });
 
+    // Also delete session state from Redis
+    await this.sessionStateService.deleteSessionState(sessionId);
+
     return { message: 'Session deleted successfully' };
+  }
+
+  async joinSession(
+    sessionId: string,
+    joinData: { userId?: string; nickname?: string; role: 'lecturer' | 'student' },
+  ) {
+    // Verify session exists
+    const session = await this.prismaService.session.findUnique({
+      where: { id: sessionId },
+      include: {
+        quiz: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+
+    if (session.status === SessionStatus.ENDED) {
+      throw new BadRequestException('Session has ended');
+    }
+
+    // Initialize session state in Redis if it doesn't exist
+    const existingState = await this.sessionStateService.getSessionState(sessionId);
+    if (!existingState) {
+      await this.sessionStateService.createSessionState(sessionId, {
+        status: session.status === SessionStatus.ACTIVE ? 'waiting' : 'waiting',
+      });
+    }
+
+    // For students, check for duplicate nicknames
+    if (joinData.role === 'student' && joinData.nickname) {
+      const participants = await this.sessionStateService.getParticipants(sessionId);
+      const existingNames: string[] = [];
+      
+      for (const socketId of participants) {
+        const participant = await this.sessionStateService.getParticipant(sessionId, socketId);
+        if (participant?.nickname) {
+          existingNames.push(participant.nickname);
+        }
+      }
+
+      if (existingNames.includes(joinData.nickname)) {
+        throw new BadRequestException(
+          'This nickname is already taken in this session. Please choose another one.',
+        );
+      }
+    }
+
+    // Return session info (state will be managed in Redis)
+    return {
+      session: {
+        id: session.id,
+        code: session.code,
+        status: session.status,
+        mode: session.mode,
+        quiz: session.quiz,
+      },
+      message: 'Successfully joined session',
+    };
   }
 }
 

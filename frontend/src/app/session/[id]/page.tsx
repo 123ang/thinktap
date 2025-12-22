@@ -64,6 +64,7 @@ export default function LecturerSessionPage() {
     startQuestion,
     showResults,
     endSession,
+    socket,
   } = useSocket({ sessionCode: session?.code, role: 'lecturer' });
 
   // Debug: Log when results change
@@ -77,12 +78,29 @@ export default function LecturerSessionPage() {
 
   // Ensure lecturer joins the session room when session loads
   useEffect(() => {
-    if (session?.code && connected) {
-      // Lecturer should join the session room to receive events
-      // The useSocket hook will auto-join, but we can also verify it here
-      console.log('[Lecturer] Session loaded, should be in room:', session.id);
-    }
-  }, [session, connected]);
+    const joinRoom = async () => {
+      if (session?.id && connected && socket) {
+        try {
+          // Join via HTTP first to initialize Redis state
+          await api.sessions.join(session.id, {
+            role: 'lecturer',
+          });
+          
+          // Then join Socket.IO room for broadcasts
+          socket.emit('join_room', {
+            sessionId: session.id,
+            role: 'lecturer',
+            userId: user?.id,
+          });
+          console.log('[Lecturer] Joined session room:', session.id);
+        } catch (error) {
+          console.error('[Lecturer] Failed to join session:', error);
+        }
+      }
+    };
+
+    void joinRoom();
+  }, [session?.id, connected, socket]);
 
   // Listen for question started confirmation to show toast
   useEffect(() => {

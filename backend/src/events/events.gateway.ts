@@ -8,30 +8,14 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { UseGuards } from '@nestjs/common';
 import { SessionsService } from '../sessions/sessions.service';
 import { QuestionsService } from '../questions/questions.service';
 import { ResponsesService } from '../responses/responses.service';
-
-interface JoinSessionPayload {
-  sessionCode: string;
-  userId?: string;
-  userEmail?: string;
-  role: 'lecturer' | 'student';
-}
+import { SessionStateService } from '../session-state/session-state.service';
 
 interface StartQuestionPayload {
   sessionId: string;
   questionId: string;
-}
-
-interface SubmitResponsePayload {
-  sessionId: string;
-  questionId: string;
-  response: any;
-  responseTimeMs: number;
-  userId?: string;
-  nickname?: string;
 }
 
 interface ShowResultsPayload {
@@ -53,114 +37,116 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  private sessionParticipants: Map<string, Set<string>> = new Map();
-  private participantNames: Map<string, string> = new Map();
-  private userSessions: Map<string, string> = new Map();
+  // Track socket to session mapping for disconnect cleanup
+  private socketToSession: Map<string, string> = new Map();
 
   constructor(
     private sessionsService: SessionsService,
     private questionsService: QuestionsService,
     private responsesService: ResponsesService,
+    private sessionStateService: SessionStateService,
   ) {}
 
   handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
+    console.log(`[Socket.IO] Client connected: ${client.id}`);
   }
 
-  handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
-    
-    // Remove client from session
-    const sessionId = this.userSessions.get(client.id);
-    if (sessionId) {
-      const participants = this.sessionParticipants.get(sessionId);
-      if (participants) {
-        participants.delete(client.id);
-        this.participantNames.delete(client.id);
-        
-        // Notify others about participant count update
-        const names = Array.from(participants)
-          .map((id) => this.participantNames.get(id))
-          .filter((n): n is string => !!n);
-
-        this.server.to(sessionId).emit('participant_count', {
-          count: participants.size,
-          names,
-        });
-      }
-      this.userSessions.delete(client.id);
-    }
-  }
-
-  @SubscribeMessage('join_session')
-  async handleJoinSession(
-    @MessageBody() payload: JoinSessionPayload,
+  @SubscribeMessage('join_room')
+  async handleJoinRoom(
+    @MessageBody() payload: { sessionId: string; userId?: string; nickname?: string; role?: 'lecturer' | 'student' },
     @ConnectedSocket() client: Socket,
   ) {
     try {
-      // Get session by code
-      const session = await this.sessionsService.findByCode(payload.sessionCode);
-
-      // Join socket room
-      await client.join(session.id);
-      console.log(`[Backend] Client ${client.id} joined session room ${session.id} (code: ${session.code}, role: ${payload.role})`);
-
-      // Track participants - only count students as participants
-      if (payload.role === 'student') {
-        if (!this.sessionParticipants.has(session.id)) {
-          this.sessionParticipants.set(session.id, new Set());
-        }
-        const participants = this.sessionParticipants.get(session.id)!;
-
-        // Prevent duplicate nicknames in the same session
-        if (payload.userEmail) {
-          const namesInSession = Array.from(participants)
-            .map((id) => this.participantNames.get(id))
-            .filter((n): n is string => !!n);
-          if (namesInSession.includes(payload.userEmail)) {
-            client.emit('join_rejected', {
-              reason: 'duplicate_nickname',
-              message:
-                'This nickname is already taken in this session. Please choose another one.',
-            });
-            return { success: false, error: 'Duplicate nickname' };
-          }
-        }
-
-        participants.add(client.id);
-        this.userSessions.set(client.id, session.id);
-        if (payload.userEmail) {
-          this.participantNames.set(client.id, payload.userEmail);
-        }
+      // Verify session exists
+      const session = await this.sessionsService.findOne(payload.sessionId, undefined);
+      
+      // Join socket room for broadcasts
+      await client.join(payload.sessionId);
+      this.socketToSession.set(client.id, payload.sessionId);
+      
+      // Add to Redis session state if participant info provided
+      if (payload.role) {
+        await this.sessionStateService.addParticipant(payload.sessionId, client.id, {
+          socketId: client.id,
+          userId: payload.userId,
+          nickname: payload.nickname,
+          role: payload.role,
+          joinedAt: Date.now(),
+        });
+        
+        // Broadcast updated participant count
+        await this.broadcastParticipantCount(payload.sessionId);
       }
-
-      // Emit success to client
-      client.emit('session_joined', {
-        session: {
-          id: session.id,
-          code: session.code,
-          mode: session.mode,
-          status: session.status,
-        },
-      });
-
-      // Broadcast participant count and names to all in session
-      const participants = this.sessionParticipants.get(session.id) || new Set<string>();
-      const participantCount = participants.size;
-      const names = Array.from(participants)
-        .map((id) => this.participantNames.get(id))
-        .filter((n): n is string => !!n);
-
-      this.server.to(session.id).emit('participant_count', {
-        count: participantCount,
-        names,
-      });
-
-      return { success: true, sessionId: session.id };
+      
+      console.log(`[Socket.IO] Client ${client.id} joined room ${payload.sessionId}`);
+      
+      return { success: true };
     } catch (error) {
       client.emit('error', { message: error.message });
       return { success: false, error: error.message };
     }
+  }
+
+  handleDisconnect(client: Socket) {
+    console.log(`[Socket.IO] Client disconnected: ${client.id}`);
+    
+    // Remove client from session state in Redis
+    const sessionId = this.socketToSession.get(client.id);
+    if (sessionId) {
+      this.sessionStateService.removeParticipant(sessionId, client.id).then(() => {
+        // Broadcast updated participant count
+        this.broadcastParticipantCount(sessionId);
+      }).catch(err => {
+        console.error('[Socket.IO] Error removing participant:', err);
+      });
+      this.socketToSession.delete(client.id);
+    }
+  }
+
+  // Helper method to broadcast participant count
+  private async broadcastParticipantCount(sessionId: string) {
+    const state = await this.sessionStateService.getSessionState(sessionId);
+    if (state) {
+      this.server.to(sessionId).emit('participant_count', {
+        count: state.participantCount,
+        names: state.participantNames,
+      });
+    }
+  }
+
+  // Method to join a session room (called after HTTP join)
+  async joinSessionRoom(sessionId: string, socketId: string, participantInfo: {
+    userId?: string;
+    nickname?: string;
+    role: 'lecturer' | 'student';
+  }) {
+    const socket = this.server.sockets.sockets.get(socketId);
+    if (!socket) {
+      throw new Error('Socket not found');
+    }
+
+    // Join socket room
+    await socket.join(sessionId);
+    this.socketToSession.set(socketId, sessionId);
+
+    // Add to Redis session state
+    await this.sessionStateService.addParticipant(sessionId, socketId, {
+      socketId,
+      userId: participantInfo.userId,
+      nickname: participantInfo.nickname,
+      role: participantInfo.role,
+      joinedAt: Date.now(),
+    });
+
+    // Broadcast updated participant count
+    await this.broadcastParticipantCount(sessionId);
+
+    // Emit session joined confirmation
+    socket.emit('session_joined', {
+      session: { id: sessionId },
+    });
+
+    console.log(`[Socket.IO] Client ${socketId} joined session room ${sessionId}`);
   }
 
   @SubscribeMessage('start_question')
@@ -179,27 +165,26 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         correctAnswerValue: JSON.stringify(question.correctAnswer),
       });
       
-      // Get all sockets in the session room to verify who's listening
-      const room = this.server.sockets.adapter.rooms.get(payload.sessionId);
-      const socketCount = room ? room.size : 0;
-      console.log(`[Backend] Room ${payload.sessionId} has ${socketCount} socket(s)`);
+      // Update session state in Redis
+      if (question.timerSeconds) {
+        await this.sessionStateService.startQuestion(
+          payload.sessionId,
+          payload.questionId,
+          question.timerSeconds,
+        );
+      }
 
-      // Broadcast question to ALL in session (including lecturer) - this ensures sync
-      // Prisma JSONB fields need to be properly serialized for Socket.IO
-      // Convert to plain JavaScript value to ensure proper serialization
+      // Serialize correctAnswer for Socket.IO
       let correctAnswerValue: any = null;
       if (question.correctAnswer !== null && question.correctAnswer !== undefined) {
-        // Prisma JSONB can be number, string, array, object, or boolean
-        // For Socket.IO, we need plain JavaScript values
         if (typeof question.correctAnswer === 'number') {
-          correctAnswerValue = Number(question.correctAnswer); // Ensure it's a plain number
+          correctAnswerValue = Number(question.correctAnswer);
         } else if (Array.isArray(question.correctAnswer)) {
-          correctAnswerValue = [...question.correctAnswer]; // Create a new array
+          correctAnswerValue = [...question.correctAnswer];
         } else if (typeof question.correctAnswer === 'object') {
-          // If it's an object, stringify and parse to get plain object
           correctAnswerValue = JSON.parse(JSON.stringify(question.correctAnswer));
         } else {
-          correctAnswerValue = question.correctAnswer; // string, boolean, etc.
+          correctAnswerValue = question.correctAnswer;
         }
       }
       
@@ -208,7 +193,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         question: question.question,
         type: question.type,
         options: question.options,
-        correctAnswer: correctAnswerValue, // Use the properly serialized value
+        correctAnswer: correctAnswerValue,
         timerSeconds: question.timerSeconds,
         order: question.order,
       };
@@ -217,54 +202,19 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         questionId: questionData.questionId,
         correctAnswer: questionData.correctAnswer,
         correctAnswerType: typeof questionData.correctAnswer,
-        correctAnswerValue: JSON.stringify(questionData.correctAnswer),
-        rawCorrectAnswer: question.correctAnswer,
-        rawCorrectAnswerType: typeof question.correctAnswer,
       });
       
-      // Warn if correctAnswer is null
       if (questionData.correctAnswer === null || questionData.correctAnswer === undefined) {
-        console.warn(`[Backend] WARNING: Question ${question.id} has no correctAnswer! Raw value:`, question.correctAnswer);
+        console.warn(`[Backend] WARNING: Question ${question.id} has no correctAnswer!`);
       }
       
+      // Broadcast to all in session room
       this.server.to(payload.sessionId).emit('question_started', questionData);
 
       // Start timer if specified
       if (question.timerSeconds) {
         this.startTimer(payload.sessionId, question.timerSeconds);
       }
-
-      return { success: true };
-    } catch (error) {
-      client.emit('error', { message: error.message });
-      return { success: false, error: error.message };
-    }
-  }
-
-  @SubscribeMessage('submit_response')
-  async handleSubmitResponse(
-    @MessageBody() payload: SubmitResponsePayload,
-    @ConnectedSocket() client: Socket,
-  ) {
-    try {
-      await this.responsesService.submit(payload.sessionId, {
-        questionId: payload.questionId,
-        response: payload.response,
-        responseTimeMs: payload.responseTimeMs,
-        userId: payload.userId,
-        nickname: payload.nickname,
-      });
-
-      // Get current response count
-      const responses = await this.responsesService.findAllByQuestion(
-        payload.questionId,
-      );
-
-      // Broadcast response count update
-      this.server.to(payload.sessionId).emit('response_received', {
-        questionId: payload.questionId,
-        responseCount: responses.length,
-      });
 
       return { success: true };
     } catch (error) {
@@ -285,6 +235,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const questionInsights = insights.questions.find(
         (q) => q.questionId === payload.questionId,
       );
+
+      // Update session state
+      await this.sessionStateService.showResults(payload.sessionId);
 
       // Broadcast results to all participants
       this.server.to(payload.sessionId).emit('results_shown', {
@@ -309,14 +262,14 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Get insights with leaderboard
       const insights = await this.responsesService.getInsights(payload.sessionId);
       
+      // Update session state
+      await this.sessionStateService.endSession(payload.sessionId);
+      
       // Broadcast session ended to all participants with leaderboard data
       this.server.to(payload.sessionId).emit('session_ended', {
         message: 'Session has ended',
         leaderboard: insights['leaderboard'] || null,
       });
-
-      // Clean up
-      this.sessionParticipants.delete(payload.sessionId);
 
       return { success: true };
     } catch (error) {
@@ -328,9 +281,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private startTimer(sessionId: string, seconds: number) {
     let remaining = seconds;
 
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       remaining--;
       
+      // Update Redis state
+      await this.sessionStateService.updateTimer(sessionId, remaining);
+      
+      // Broadcast timer update
       this.server.to(sessionId).emit('timer_update', {
         remaining,
       });
@@ -341,5 +298,12 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
     }, 1000);
   }
-}
 
+  // Method to broadcast response submitted (called from responses service)
+  async broadcastResponseSubmitted(sessionId: string, questionId: string, responseCount: number) {
+    this.server.to(sessionId).emit('response_submitted', {
+      questionId,
+      responseCount,
+    });
+  }
+}

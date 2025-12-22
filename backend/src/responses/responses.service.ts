@@ -139,6 +139,14 @@ export class ResponsesService {
       },
     });
 
+    // Get current response count for this question
+    const responseCount = await this.prismaService.response.count({
+      where: { questionId: submitResponseDto.questionId },
+    });
+
+    // Note: Broadcasting will be handled by EventsGateway if needed
+    // This is done via dependency injection in the controller/service that calls this
+
     return response;
   }
 

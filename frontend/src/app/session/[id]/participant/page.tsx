@@ -40,14 +40,12 @@ export default function ParticipantSessionPage() {
     points: number;
   } | null>(null);
 
-  // Auto-join will happen when session code is available, but we'll also join with nickname
+  // Socket.IO only for receiving broadcasts
   const {
     connected,
     currentQuestion,
     timeRemaining,
     results,
-    submitResponse,
-    joinSession,
     socket,
   } = useSocket({ sessionCode: session?.code, role: 'student', autoConnect: true });
 
@@ -60,16 +58,41 @@ export default function ParticipantSessionPage() {
     }
   }, [sessionId]);
 
-  // Join session with nickname when both session and nickname are available
+  // Join session via HTTP endpoint when both session and nickname are available
   const hasJoinedRef = useRef(false);
   useEffect(() => {
-    if (session?.code && nickname && connected && socket && !hasJoinedRef.current) {
-      console.log('Joining session as participant with nickname:', session.code, nickname);
-      hasJoinedRef.current = true;
-      // Explicitly join with nickname
-      joinSession(session.code, nickname);
-    }
-  }, [session?.code, nickname, connected, socket, joinSession]);
+    const joinSession = async () => {
+      if (session?.id && nickname && connected && socket && !hasJoinedRef.current) {
+        try {
+          console.log('[Participant] Joining session via HTTP:', session.id, nickname);
+          hasJoinedRef.current = true;
+          
+          // Join via HTTP endpoint
+          const result = await api.sessions.join(session.id, {
+            nickname,
+            role: 'student',
+          });
+          
+          console.log('[Participant] Joined session:', result);
+          
+          // After HTTP join, join Socket.IO room for broadcasts
+          if (socket) {
+            socket.emit('join_room', {
+              sessionId: session.id,
+              nickname,
+              role: 'student',
+            });
+          }
+        } catch (error: any) {
+          console.error('[Participant] Failed to join session:', error);
+          toast.error(error?.response?.data?.message || 'Failed to join session');
+          hasJoinedRef.current = false;
+        }
+      }
+    };
+
+    void joinSession();
+  }, [session?.id, nickname, connected, socket]);
 
   // Debug: Log when currentQuestion changes
   useEffect(() => {
@@ -196,7 +219,7 @@ export default function ParticipantSessionPage() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!currentQuestion || responseSubmitted) return;
 
     let finalResponse: any;
@@ -225,16 +248,21 @@ export default function ParticipantSessionPage() {
 
     const responseTimeMs = startTime ? Date.now() - startTime : 0;
 
-    submitResponse({
-      sessionId,
-      questionId: currentQuestion.id,
-      response: finalResponse, // Now sending index(es) instead of text
-      responseTimeMs,
-      nickname: nickname || undefined,
-    });
+    try {
+      // Submit via HTTP endpoint
+      await api.responses.submit(sessionId, {
+        questionId: currentQuestion.id,
+        response: finalResponse, // Sending index(es) instead of text
+        responseTimeMs,
+        nickname: nickname || undefined,
+      });
 
-    setResponseSubmitted(true);
-    toast.success('Response submitted!');
+      setResponseSubmitted(true);
+      toast.success('Response submitted!');
+    } catch (error: any) {
+      console.error('[Participant] Failed to submit response:', error);
+      toast.error(error?.response?.data?.message || 'Failed to submit response');
+    }
   };
 
   // Check if response is valid for button enable/disable

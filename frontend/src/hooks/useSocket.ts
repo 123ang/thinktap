@@ -154,43 +154,13 @@ export const useSocket = (options: UseSocketOptions = {}) => {
     };
   }, [autoConnect]);
 
-  // Join session when sessionCode becomes available (only if no explicit joinSession call is made)
-  // Note: This auto-join doesn't include nickname, so components should use joinSession() for students
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (socket && connected && sessionCode && role === 'lecturer') {
-      // Only auto-join for lecturers; students should use explicit joinSession() with nickname
-      socket.emit('join_session', {
-        sessionCode,
-        role,
-      });
-      console.log(`Auto-joining session as ${role}:`, sessionCode);
-    }
-  }, [sessionCode, connected, role]);
-
-  // Socket methods
-  const joinSession = useCallback(
-    (code: string, nickname?: string) => {
-      if (socketRef.current) {
-        socketRef.current.emit('join_session', {
-          sessionCode: code,
-          role: 'student',
-          userEmail: nickname,
-        });
-      }
-    },
-    [],
-  );
+  // Note: joinSession and submitResponse are now HTTP endpoints, not Socket.IO
+  // Socket.IO is only used for receiving broadcasts
+  // Components should use api.sessions.join() and api.responses.submit() instead
 
   const startQuestion = useCallback((sessionId: string, questionId: string) => {
     if (socketRef.current) {
       socketRef.current.emit('start_question', { sessionId, questionId });
-    }
-  }, []);
-
-  const submitResponse = useCallback((data: SubmitResponseDto & { sessionId: string }) => {
-    if (socketRef.current) {
-      socketRef.current.emit('submit_response', data);
     }
   }, []);
 
@@ -220,9 +190,7 @@ export const useSocket = (options: UseSocketOptions = {}) => {
     currentQuestion,
     timeRemaining,
     results,
-    joinSession,
     startQuestion,
-    submitResponse,
     showResults,
     endSession,
     disconnect,

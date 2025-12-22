@@ -25,6 +25,7 @@ model User {
   responses            Response[]
 
   @@index([email])
+  @@map("user")
 }
 
 // Quiz Model - Reusable content that can be hosted in multiple sessions
@@ -39,6 +40,7 @@ model Quiz {
   updatedAt  DateTime   @updatedAt
 
   @@index([userId])
+  @@map("quiz")
 }
 
 enum Plan {
@@ -72,6 +74,7 @@ model Session {
   @@index([code])
   @@index([lecturerId])
   @@index([quizId])
+  @@map("session")
 }
 
 enum SessionMode {
@@ -102,6 +105,7 @@ model Question {
 
   @@index([quizId])
   @@index([quizId, order])
+  @@map("question")
 }
 
 enum QuestionType {
@@ -132,4 +136,5 @@ model Response {
   @@index([questionId])
   @@index([userId])
   @@index([sessionId, nickname]) // For leaderboard queries
+  @@map("response")
 }

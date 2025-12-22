@@ -12,7 +12,7 @@ export default function WaitingForQuizPage() {
 
   const router = useRouter();
   const [nickname, setNickname] = useState<string | null>(null);
-  const { joinSession, socket, connected } = useSocket({ autoConnect: true });
+  const { socket, connected } = useSocket({ autoConnect: true });
   const hasJoined = useRef(false);
 
   useEffect(() => {
@@ -21,48 +21,61 @@ export default function WaitingForQuizPage() {
     setNickname(stored || '');
   }, [sessionId]);
 
-  // After we have nickname AND socket is connected, actually join the websocket session so the host sees us
+  // Join session via HTTP endpoint when nickname and socket are ready
   useEffect(() => {
     const doJoin = async () => {
-      if (!nickname || !connected || hasJoined.current) return;
+      if (!nickname || !connected || !socket || hasJoined.current) return;
       hasJoined.current = true;
       try {
-        // Try to get session by ID first, if that fails, try using sessionId as code
-        let sessionCode: string;
+        // Get session by ID to get the actual session ID (not code)
+        let actualSessionId: string;
         try {
           const session = await api.sessions.getById(sessionId);
-          sessionCode = session.code;
+          actualSessionId = session.id;
         } catch (err) {
-          // If getById fails (404), the sessionId might actually be the session code
-          // This can happen if the URL uses the code instead of the ID
-          console.warn('Could not get session by ID, using sessionId as code');
-          sessionCode = sessionId;
+          // If getById fails, try using sessionId as code to get the session
+          try {
+            const session = await api.sessions.getByCode(sessionId);
+            actualSessionId = session.id;
+          } catch (err2) {
+            console.error('Could not find session:', err2);
+            hasJoined.current = false;
+            return;
+          }
         }
-        joinSession(sessionCode, nickname);
-      } catch (err) {
-        console.error('Failed to join live session from waiting page:', err);
+
+        // Join via HTTP endpoint
+        const result = await api.sessions.join(actualSessionId, {
+          nickname,
+          role: 'student',
+        });
+
+        console.log('[Waiting] Joined session:', result);
+
+        // After HTTP join, join Socket.IO room for broadcasts
+        if (socket) {
+          socket.emit('join_room', {
+            sessionId: actualSessionId,
+            nickname,
+            role: 'student',
+          });
+        }
+      } catch (err: any) {
+        console.error('[Waiting] Failed to join session:', err);
+        if (err?.response?.data?.message?.includes('nickname') || err?.response?.status === 400) {
+          // Duplicate nickname or other validation error
+          localStorage.removeItem(`thinktap-nickname-${sessionId}`);
+          router.replace(`/session/${sessionId}/join?duplicate=1`);
+        }
         hasJoined.current = false;
       }
     };
 
     void doJoin();
-  }, [nickname, sessionId, joinSession, connected]);
+  }, [nickname, sessionId, connected, socket, router]);
 
-  // Listen for duplicate nickname rejection
-  useEffect(() => {
-    if (!socket) return;
-    const handler = (payload: { reason: string; message?: string }) => {
-      if (payload.reason === 'duplicate_nickname') {
-        // Clear stored nickname and send back to join page with a flag
-        localStorage.removeItem(`thinktap-nickname-${sessionId}`);
-        router.replace(`/session/${sessionId}/join?duplicate=1`);
-      }
-    };
-    socket.on('join_rejected', handler);
-    return () => {
-      socket.off('join_rejected', handler);
-    };
-  }, [socket, sessionId, router]);
+  // Note: Duplicate nickname rejection is now handled in the HTTP join endpoint
+  // No need for Socket.IO join_rejected listener
 
   // Redirect to participant page when question starts
   useEffect(() => {

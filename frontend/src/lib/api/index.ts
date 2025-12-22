@@ -67,6 +67,9 @@ export const sessionsApi = {
   getByCode: (code: string) =>
     apiClient.get<Session>(`/sessions/code/${code}`),
 
+  join: (sessionId: string, data: { nickname?: string; role: 'lecturer' | 'student' }) =>
+    apiClient.post<{ session: Session; message: string }>(`/sessions/${sessionId}/join`, data),
+
   updateStatus: (sessionId: string, status: string) =>
     apiClient.patch<Session>(`/sessions/${sessionId}/status`, { status }),
 
