@@ -83,6 +83,7 @@ export interface Question {
   options?: string[];
   correctAnswer: any;
   timerSeconds?: number;
+  points?: number; // Points awarded for correct answer (20 = standard, 40 = double)
   order: number;
   createdAt: string;
   responses?: Response[];
@@ -137,6 +138,7 @@ export interface CreateQuestionDto {
   options?: string[];
   correctAnswer: any;
   timerSeconds?: number;
+  points?: number; // Points awarded for correct answer (20 = standard, 40 = double)
   order: number;
 }
 

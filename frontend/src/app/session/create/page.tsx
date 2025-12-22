@@ -171,6 +171,125 @@ function CreateSessionPageContent() {
     return options;
   })();
 
+  // Auto-save current question if it has content (called before creating new question)
+  const autoSaveCurrentQuestion = async (): Promise<boolean> => {
+    // Only auto-save if there's a question being edited and it has content
+    if (!selectedQuestionId || !question.trim()) {
+      return true; // Nothing to save, continue
+    }
+
+    // Skip auto-save if already saved (not a draft)
+    if (!selectedQuestionId.startsWith('draft-')) {
+      return true; // Already saved, continue
+    }
+
+    // Validate the question has minimum required content
+    const filledOptions = visibleOptions.map((o) => o.trim()).filter((o) => o.length > 0);
+    if (questionKind !== 'TRUE_FALSE' && filledOptions.length < 2) {
+      // Not enough options, skip auto-save
+      return true;
+    }
+
+    if (correctIndexes.length === 0) {
+      // No correct answer selected, skip auto-save
+      return true;
+    }
+
+    try {
+      // Ensure quiz exists
+      let activeQuizId = sessionId;
+      if (!activeQuizId) {
+        const quizTitle = title.trim() || 'Untitled Quiz';
+        const quiz = await api.quizzes.create({ title: quizTitle });
+        activeQuizId = quiz.id;
+        setSessionId(quiz.id);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`thinktap-title-${quiz.id}`, quizTitle);
+        }
+        router.replace(`/session/create?sessionId=${quiz.id}`);
+      }
+
+      // Prepare question data
+      let type: QuestionType;
+      if (questionKind === 'TRUE_FALSE') {
+        type = QuestionType.TRUE_FALSE;
+      } else if (questionKind === 'MC_MULTI') {
+        type = QuestionType.MULTIPLE_SELECT;
+      } else {
+        type = QuestionType.MULTIPLE_CHOICE;
+      }
+
+      const finalOptions = questionKind === 'TRUE_FALSE' ? ['True', 'False'] : filledOptions;
+
+      let correctAnswer: any;
+      if (type === QuestionType.MULTIPLE_SELECT) {
+        correctAnswer = correctIndexes.filter((i) => i >= 0 && i < finalOptions.length);
+        if (correctAnswer.length === 0) {
+          return true; // Invalid, skip
+        }
+      } else {
+        const selectedIndex = correctIndexes[0];
+        if (selectedIndex === undefined || selectedIndex < 0 || selectedIndex >= finalOptions.length) {
+          return true; // Invalid, skip
+        }
+        correctAnswer = selectedIndex;
+      }
+
+      if (correctAnswer === null || correctAnswer === undefined) {
+        return true; // Invalid, skip
+      }
+
+      // Determine order
+      const draftIndex = sidebarQuestions.findIndex((q) => q.id === selectedQuestionId);
+      const questionOrder = draftIndex !== -1 ? draftIndex : sidebarQuestions.length;
+
+      // Convert pointsMode to points
+      const pointsValue = pointsMode === 'DOUBLE' ? 40 : 20;
+
+      const payload: CreateQuestionDto = {
+        type,
+        question,
+        options: type === QuestionType.LONG_ANSWER ? undefined : finalOptions,
+        correctAnswer,
+        timerSeconds: timeLimit,
+        points: pointsValue,
+        order: questionOrder,
+      };
+
+      // Save the question
+      const created = await api.questions.create(activeQuizId, payload);
+
+      // Update sidebar with saved question
+      const createdPointsMode = (created.points ?? 20) === 40 ? 'DOUBLE' : 'STANDARD';
+      const sidebarData: SidebarQuestion = {
+        id: created.id,
+        question: created.question,
+        type: created.type,
+        options: (created.options as string[]) || finalOptions,
+        timerSeconds: created.timerSeconds,
+        correctAnswer: created.correctAnswer,
+        pointsMode: createdPointsMode,
+      };
+
+      setSidebarQuestions((prev) => {
+        const index = prev.findIndex((q) => q.id === selectedQuestionId);
+        if (index !== -1) {
+          const copy = [...prev];
+          copy[index] = sidebarData;
+          return copy;
+        }
+        return [...prev, sidebarData];
+      });
+
+      setSelectedQuestionId(created.id);
+      return true; // Success
+    } catch (error) {
+      console.error('[Auto-save] Error auto-saving question:', error);
+      // Don't block the user from adding a new question if auto-save fails
+      return true; // Continue anyway
+    }
+  };
+
   const handleCreate = async () => {
     if (!question.trim()) {
       toast.error('Please enter a question');
@@ -285,12 +404,16 @@ function CreateSessionPageContent() {
         }
       }
 
+      // Convert pointsMode to points: STANDARD = 20, DOUBLE = 40
+      const pointsValue = pointsMode === 'DOUBLE' ? 40 : 20;
+
       const payload: CreateQuestionDto = {
         type,
         question,
         options: type === QuestionType.LONG_ANSWER ? undefined : finalOptions,
         correctAnswer,
         timerSeconds: timeLimit,
+        points: pointsValue,
         order: questionOrder,
       };
 
@@ -321,6 +444,8 @@ function CreateSessionPageContent() {
       // Always replace the selected question (whether draft or existing) with the saved version
       setSidebarQuestions((prev) => {
         console.log('[Create Question] Updating sidebar. Current items:', prev.length, 'selectedQuestionId:', selectedQuestionId);
+        // Convert points back to pointsMode for sidebar
+        const createdPointsMode = (created.points ?? 20) === 40 ? 'DOUBLE' : 'STANDARD';
         const sidebarData: SidebarQuestion = {
           id: created.id,
           question: created.question,
@@ -328,7 +453,7 @@ function CreateSessionPageContent() {
           options: (created.options as string[]) || finalOptions,
           timerSeconds: created.timerSeconds,
           correctAnswer: created.correctAnswer,
-          pointsMode: pointsMode, // Preserve the current points mode
+          pointsMode: createdPointsMode,
         };
         console.log('[Create Question] New sidebar data:', sidebarData);
 
@@ -458,6 +583,7 @@ function CreateSessionPageContent() {
         // Sort by order field to maintain correct sequence
         const sorted = [...existing].sort((a, b) => (a.order || 0) - (b.order || 0));
         console.log('[Edit Quiz] Sorted questions:', sorted.length, 'items');
+        // Convert points to pointsMode: 20 = STANDARD, 40 = DOUBLE
         const mapped: SidebarQuestion[] = sorted.map((q) => ({
           id: q.id,
           question: q.question,
@@ -465,7 +591,7 @@ function CreateSessionPageContent() {
           options: (q.options as string[]) || [],
           timerSeconds: q.timerSeconds,
           correctAnswer: q.correctAnswer,
-          pointsMode: 'STANDARD', // Default for existing questions (can be enhanced later to store in DB)
+          pointsMode: (q.points ?? 20) === 40 ? 'DOUBLE' : 'STANDARD',
         }));
         console.log('[Edit Quiz] Mapped to sidebar format:', mapped);
         // Set the sidebar with loaded questions (state was already cleared in the URL effect)
@@ -640,15 +766,28 @@ function CreateSessionPageContent() {
                       setPointsMode(q.pointsMode ?? 'STANDARD');
                       const opts = q.options || [];
                       const answer = q.correctAnswer;
+
+                      // Handle both new format (indices) and old format (text)
                       if (Array.isArray(answer)) {
-                        setCorrectIndexes(
-                          answer
+                        if (answer.length > 0 && typeof answer[0] === 'number') {
+                          // Already indices
+                          const indices = answer.filter((i: number) => i >= 0 && i < opts.length);
+                          setCorrectIndexes(indices.length > 0 ? indices : [0]);
+                        } else {
+                          // Old format: convert text array to indices
+                          const indices = answer
                             .map((a: any) => opts.indexOf(a))
-                            .filter((i: number) => i >= 0),
-                        );
+                            .filter((i: number) => i >= 0);
+                          setCorrectIndexes(indices.length > 0 ? indices : [0]);
+                        }
                       } else if (answer != null) {
-                        const idx = opts.indexOf(answer);
-                        setCorrectIndexes([idx >= 0 ? idx : 0]);
+                        if (typeof answer === 'number') {
+                          const idx = answer >= 0 && answer < opts.length ? answer : 0;
+                          setCorrectIndexes([idx]);
+                        } else {
+                          const idx = opts.indexOf(answer);
+                          setCorrectIndexes([idx >= 0 ? idx : 0]);
+                        }
                       } else {
                         setCorrectIndexes([0]);
                       }
@@ -697,7 +836,11 @@ function CreateSessionPageContent() {
                   variant="outline"
                   size="sm"
                   className="w-full justify-center"
-                  onClick={() => {
+                  onClick={async () => {
+                    // Auto-save current question before creating new one
+                    await autoSaveCurrentQuestion();
+
+                    // Now create new draft question
                     setQuestion('');
                     setOptions(['', '', '', '']);
                     setCorrectIndexes([0]);

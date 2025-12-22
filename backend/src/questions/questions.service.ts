@@ -48,6 +48,7 @@ export class QuestionsService {
         options: createQuestionDto.options ?? undefined,
         correctAnswer: createQuestionDto.correctAnswer,
         timerSeconds: createQuestionDto.timerSeconds,
+        points: createQuestionDto.points ?? 20, // Default to 20 (standard) if not provided
         order: createQuestionDto.order,
       },
     });
@@ -95,6 +96,7 @@ export class QuestionsService {
             options: q.options ?? undefined,
             correctAnswer: q.correctAnswer,
             timerSeconds: q.timerSeconds,
+            points: q.points ?? 20, // Default to 20 (standard) if not provided
             order: q.order,
           },
         }),

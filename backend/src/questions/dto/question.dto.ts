@@ -23,6 +23,10 @@ export class CreateQuestionDto {
   timerSeconds?: number;
 
   @IsNumber()
+  @IsOptional()
+  points?: number; // Points awarded for correct answer (20 = standard, 40 = double)
+
+  @IsNumber()
   order: number;
 }
 

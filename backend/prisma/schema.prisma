@@ -99,6 +99,7 @@ model Question {
   options       Json?        // JSONB - For MC/MS: ["Option A", "Option B", ...]
   correctAnswer Json         // JSONB - Varies by question type
   timerSeconds  Int?
+  points        Int          @default(20) // Points awarded for correct answer (20 = standard, 40 = double)
   order         Int
   createdAt     DateTime     @default(now())
   responses     Response[]
