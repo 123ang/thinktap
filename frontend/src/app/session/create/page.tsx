@@ -42,6 +42,7 @@ type SidebarQuestion = {
   timerSeconds?: number | null;
   correctAnswer?: any;
   isDraft?: boolean;
+  pointsMode?: PointsMode;
 };
 
 function CreateSessionPageContent() {
@@ -55,7 +56,7 @@ function CreateSessionPageContent() {
   const [question, setQuestion] = useState('');
   const [questionKind, setQuestionKind] = useState<QuestionKind>('MC_SINGLE');
   const [timeLimit, setTimeLimit] = useState<number>(20);
-  const [pointsMode, setPointsMode] = useState<PointsMode>('STANDARD');
+  const [pointsMode, setPointsMode] = useState<PointsMode>('STANDARD'); // Current editor state
   const [options, setOptions] = useState<string[]>(['', '', '', '']);
   const [correctIndexes, setCorrectIndexes] = useState<number[]>([0]);
   const [loading, setLoading] = useState(false);
@@ -81,16 +82,17 @@ function CreateSessionPageContent() {
     setOptions(['', '', '', '']);
     setCorrectIndexes([0]);
     setTimeLimit(20);
-    setSidebarQuestions([
-      {
-        id: draftId,
-        question: 'Untitled question',
-        type: QuestionType.MULTIPLE_CHOICE,
-        options: ['', '', '', ''],
-        timerSeconds: 20,
-        isDraft: true,
-      },
-    ]);
+        setSidebarQuestions([
+          {
+            id: draftId,
+            question: 'Untitled question',
+            type: QuestionType.MULTIPLE_CHOICE,
+            options: ['', '', '', ''],
+            timerSeconds: 20,
+            isDraft: true,
+            pointsMode: 'STANDARD',
+          },
+        ]);
   }, [searchParams, sessionId, sidebarQuestions.length]);
 
   // If the route contains a quizId query param, set it and reset loaded flag
@@ -326,6 +328,7 @@ function CreateSessionPageContent() {
           options: (created.options as string[]) || finalOptions,
           timerSeconds: created.timerSeconds,
           correctAnswer: created.correctAnswer,
+          pointsMode: pointsMode, // Preserve the current points mode
         };
         console.log('[Create Question] New sidebar data:', sidebarData);
 
@@ -395,11 +398,13 @@ function CreateSessionPageContent() {
             setOptions(next.options && next.options.length ? next.options : ['', '', '', '']);
           }
           setTimeLimit(next.timerSeconds ?? 20);
+          setPointsMode(next.pointsMode ?? 'STANDARD');
         } else {
           // No questions left, clear editor
           setQuestion('');
           setOptions(['', '', '', '']);
           setCorrectIndexes([0]);
+          setPointsMode('STANDARD');
         }
       }
     } catch (error) {
@@ -460,6 +465,7 @@ function CreateSessionPageContent() {
           options: (q.options as string[]) || [],
           timerSeconds: q.timerSeconds,
           correctAnswer: q.correctAnswer,
+          pointsMode: 'STANDARD', // Default for existing questions (can be enhanced later to store in DB)
         }));
         console.log('[Edit Quiz] Mapped to sidebar format:', mapped);
         // Set the sidebar with loaded questions (state was already cleared in the URL effect)
@@ -484,6 +490,7 @@ function CreateSessionPageContent() {
             setOptions(first.options && first.options.length ? first.options : ['', '', '', '']);
           }
           setTimeLimit(first.timerSeconds ?? 20);
+          setPointsMode(first.pointsMode ?? 'STANDARD');
           const opts = first.options || [];
           const answer = first.correctAnswer;
           console.log('[Edit Quiz] First question correctAnswer:', answer, 'type:', typeof answer, 'isArray:', Array.isArray(answer));
@@ -630,6 +637,7 @@ function CreateSessionPageContent() {
                       }
 
                       setTimeLimit(q.timerSeconds ?? 20);
+                      setPointsMode(q.pointsMode ?? 'STANDARD');
                       const opts = q.options || [];
                       const answer = q.correctAnswer;
                       if (Array.isArray(answer)) {
@@ -677,7 +685,7 @@ function CreateSessionPageContent() {
                     <div className="mt-1 flex items-center justify-between">
                       <span className="text-[11px] text-gray-400">Question</span>
                       <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[10px] font-medium text-amber-700">
-                        20 pts
+                        {q.pointsMode === 'DOUBLE' ? '40 pts' : '20 pts'}
                       </span>
                     </div>
                   </div>
@@ -694,6 +702,7 @@ function CreateSessionPageContent() {
                     setOptions(['', '', '', '']);
                     setCorrectIndexes([0]);
                     setQuestionKind('MC_SINGLE');
+                    setPointsMode('STANDARD');
                     const draftId = `draft-${Date.now()}`;
                     setSelectedQuestionId(draftId);
                     setSidebarQuestions((prev) => [
@@ -703,6 +712,7 @@ function CreateSessionPageContent() {
                         question: 'Untitled question',
                         type: QuestionType.MULTIPLE_CHOICE,
                         isDraft: true,
+                        pointsMode: 'STANDARD',
                       },
                     ]);
                   }}
@@ -875,7 +885,10 @@ function CreateSessionPageContent() {
                   </Label>
                   <Select
                     value={pointsMode}
-                    onValueChange={(v: PointsMode) => setPointsMode(v)}
+                    onValueChange={(v: PointsMode) => {
+                      setPointsMode(v);
+                      updateCurrentSidebarQuestion({ pointsMode: v });
+                    }}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue />
