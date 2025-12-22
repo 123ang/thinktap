@@ -53,8 +53,8 @@ export default function LecturerSessionPage() {
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [showPodium, setShowPodium] = useState(false);
   const [topRankings, setTopRankings] = useState<any[]>([]);
-  const [preCountdown, setPreCountdown] = useState<number | null>(null);
   const [pendingQuestionId, setPendingQuestionId] = useState<string | null>(null);
+  const [hasSeenCountdown, setHasSeenCountdown] = useState(false);
   
   const {
     connected,
@@ -63,9 +63,12 @@ export default function LecturerSessionPage() {
     currentQuestion,
     timeRemaining,
     results,
+    preCountdown,
+    emitPreCountdown,
     startQuestion,
     showResults,
     endSession,
+    clearQuestion,
     socket,
   } = useSocket({ sessionCode: session?.code, role: 'lecturer' });
 
@@ -77,6 +80,16 @@ export default function LecturerSessionPage() {
   useEffect(() => {
     loadSession();
   }, [sessionId]);
+
+  // Clear question state if session is not ACTIVE (to prevent showing stale questions)
+  useEffect(() => {
+    if (session && session.status !== 'ACTIVE' && currentQuestion) {
+      console.log('[Lecturer] Session not ACTIVE, clearing question state');
+      clearQuestion();
+      setPendingQuestionId(null); // Also clear pending question
+      setHasSeenCountdown(false);
+    }
+  }, [session?.status, currentQuestion, clearQuestion]);
 
   // Ensure lecturer joins the session room when session loads
   useEffect(() => {
@@ -174,10 +187,11 @@ export default function LecturerSessionPage() {
 
   const handleStartSession = async () => {
     try {
+      // Clear any existing question state before starting session
+      clearQuestion();
       await api.sessions.updateStatus(sessionId, 'ACTIVE');
       await loadSession();
       toast.success('Session started!');
-      // First question will auto-start via useEffect
     } catch (error) {
       toast.error('Failed to start session');
     }
@@ -223,31 +237,45 @@ export default function LecturerSessionPage() {
       return;
     }
 
-    // If this is the first question (no currentQuestion yet), show a 5-second countdown
-    if (!currentQuestion && preCountdown === null) {
+    console.log('[Lecturer] handleStartQuestion called:', {
+      questionId,
+      currentQuestion: currentQuestion?.id,
+      preCountdown,
+      pendingQuestionId,
+    });
+
+    // If this is the first question (no currentQuestion yet), broadcast a 5-second countdown
+    if (!currentQuestion && preCountdown === null && !hasSeenCountdown) {
+      console.log('[Lecturer] Starting pre-countdown for first question');
       setPendingQuestionId(questionId);
-      setPreCountdown(5);
-
-      let remaining = 5;
-      const interval = setInterval(() => {
-        remaining -= 1;
-        setPreCountdown(remaining);
-
-        if (remaining <= 0) {
-          clearInterval(interval);
-          setPreCountdown(null);
-          setPendingQuestionId(null);
-          // Emit to backend - state will be updated via socket event
-          startQuestion(sessionId, questionId);
-        }
-      }, 1000);
-
+      setHasSeenCountdown(false);
+      // Emit pre_countdown to all clients via socket
+      emitPreCountdown(sessionId, 5);
       return;
     }
 
     // For subsequent questions, start immediately
+    console.log('[Lecturer] Starting question immediately (not first question)');
     startQuestion(sessionId, questionId);
   };
+
+  // Manage countdown lifecycle: mark when it starts, and start question when it finishes
+  useEffect(() => {
+    // Countdown just started
+    if (preCountdown !== null && !hasSeenCountdown) {
+      console.log('[Lecturer] Countdown started with value:', preCountdown);
+      setHasSeenCountdown(true);
+      return;
+    }
+
+    // Countdown finished -> start pending question
+    if (preCountdown === null && hasSeenCountdown && pendingQuestionId) {
+      console.log('[Lecturer] Countdown finished, starting question:', pendingQuestionId);
+      startQuestion(sessionId, pendingQuestionId);
+      setPendingQuestionId(null);
+      setHasSeenCountdown(false);
+    }
+  }, [preCountdown, hasSeenCountdown, pendingQuestionId, sessionId, startQuestion]);
 
   const handleShowResults = (questionId: string) => {
     console.log('[Lecturer] Showing results for question:', questionId);
@@ -394,6 +422,19 @@ export default function LecturerSessionPage() {
             )}
           </div>
 
+          {/* Full-screen pre-countdown overlay */}
+          {preCountdown !== null && !currentQuestion && (
+            <div className="fixed inset-0 bg-gradient-to-br from-rose-500 via-orange-400 to-amber-300 z-50 flex flex-col items-center justify-center">
+              <div className="text-center space-y-8">
+                <p className="text-2xl text-white/90 font-medium">Get Ready!</p>
+                <div className="w-48 h-48 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
+                  <span className="text-9xl font-bold text-white">{preCountdown}</span>
+                </div>
+                <p className="text-xl text-white/80">First question starting soon...</p>
+              </div>
+            </div>
+          )}
+
           {/* Full-screen question view when active */}
           {currentQuestion ? (
             <div className="fixed inset-0 bg-gradient-to-br from-rose-500 via-orange-400 to-amber-300 z-50 flex flex-col items-center justify-center p-4 overflow-auto">
@@ -508,11 +549,6 @@ export default function LecturerSessionPage() {
                     <p className="text-lg text-gray-700">
                       {questions.length} {questions.length === 1 ? 'question' : 'questions'} ready
                     </p>
-                    {preCountdown !== null && !currentQuestion && (
-                      <p className="text-3xl font-bold text-rose-700">
-                        Starting in {preCountdown}...
-                      </p>
-                    )}
                     {!connected && (
                       <p className="text-sm text-amber-600">Connecting to session...</p>
                     )}

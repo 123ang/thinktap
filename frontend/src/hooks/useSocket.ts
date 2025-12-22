@@ -6,6 +6,173 @@ import { Question, SubmitResponseDto, QuestionInsight } from '@/types/api';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
 
+// Module-level singleton socket instance - persists across page navigations
+let globalSocket: Socket | null = null;
+let globalConnected = false;
+let globalParticipantCount = 0;
+let globalParticipantNames: string[] = [];
+let globalCurrentQuestion: Question | null = null;
+let globalTimeRemaining: number | null = null;
+let globalResults: QuestionInsight | null = null;
+let globalPreCountdown: number | null = null;
+let preCountdownInterval: NodeJS.Timeout | null = null;
+
+// Listeners for state updates
+const stateListeners = new Set<() => void>();
+
+const notifyListeners = () => {
+  stateListeners.forEach(listener => listener());
+};
+
+// Initialize socket once (module level)
+const initSocket = () => {
+  if (globalSocket) return globalSocket;
+
+  console.log('[useSocket] Creating global socket connection');
+  const socket = io(SOCKET_URL, {
+    transports: ['websocket'],
+    autoConnect: true,
+  });
+
+  globalSocket = socket;
+
+  // Connection events
+  socket.on('connect', () => {
+    console.log('[useSocket] Socket connected');
+    globalConnected = true;
+    notifyListeners();
+  });
+
+  socket.on('disconnect', () => {
+    console.log('[useSocket] Socket disconnected');
+    globalConnected = false;
+    notifyListeners();
+  });
+
+  // Session events
+  socket.on('participant_count', (data: { count: number; names?: string[] }) => {
+    const allNames = data.names || [];
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const filteredNames = allNames.filter((name) => !uuidRegex.test(name));
+    console.log('[useSocket] Participant count updated:', filteredNames.length, filteredNames);
+    globalParticipantCount = filteredNames.length;
+    globalParticipantNames = filteredNames;
+    notifyListeners();
+  });
+
+  socket.on('session_joined', (data: any) => {
+    console.log('[useSocket] Session joined:', data);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('session_ready', { detail: data }));
+    }
+  });
+
+  socket.on('question_started', (data: any) => {
+    console.log('[useSocket] Question started event received:', data);
+    console.log('[useSocket] correctAnswer from backend:', data.correctAnswer, 'type:', typeof data.correctAnswer);
+    
+    if (data.correctAnswer === null || data.correctAnswer === undefined) {
+      console.warn('[useSocket] WARNING: Question has no correctAnswer!');
+    }
+    
+    const question: Question = {
+      id: data.questionId,
+      sessionId: '',
+      question: data.question,
+      type: data.type,
+      options: data.options,
+      correctAnswer: data.correctAnswer !== undefined && data.correctAnswer !== null 
+        ? data.correctAnswer 
+        : null,
+      timerSeconds: data.timerSeconds,
+      order: data.order,
+      responses: [],
+      createdAt: new Date().toISOString(),
+    };
+    console.log('[useSocket] Setting currentQuestion with correctAnswer:', question.correctAnswer);
+    globalCurrentQuestion = question;
+    globalTimeRemaining = data.timerSeconds || null;
+    globalResults = null;
+    globalPreCountdown = null; // Clear pre-countdown when question starts
+    if (preCountdownInterval) {
+      clearInterval(preCountdownInterval);
+      preCountdownInterval = null;
+    }
+    notifyListeners();
+  });
+
+  socket.on('timer_update', (data: { remaining: number }) => {
+    globalTimeRemaining = data.remaining;
+    notifyListeners();
+  });
+
+  socket.on('timer_ended', () => {
+    console.log('[useSocket] Timer ended');
+    globalTimeRemaining = 0;
+    notifyListeners();
+  });
+
+  socket.on('pre_countdown', (data: { duration: number; startedAt: number }) => {
+    console.log('[useSocket] Pre-countdown received:', data);
+    
+    if (preCountdownInterval) {
+      clearInterval(preCountdownInterval);
+    }
+    
+    const elapsed = Math.floor((Date.now() - data.startedAt) / 1000);
+    let remaining = Math.max(0, data.duration - elapsed);
+    
+    globalPreCountdown = remaining;
+    notifyListeners();
+    
+    preCountdownInterval = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(preCountdownInterval!);
+        preCountdownInterval = null;
+        globalPreCountdown = null;
+      } else {
+        globalPreCountdown = remaining;
+      }
+      notifyListeners();
+    }, 1000);
+  });
+
+  socket.on('response_submitted', (data: { responseCount: number }) => {
+    console.log('[useSocket] Response count:', data.responseCount);
+  });
+
+  socket.on('results_shown', (data: any) => {
+    console.log('[useSocket] Results shown event received:', data);
+    if (data.insights) {
+      globalResults = data.insights;
+    } else {
+      globalResults = data;
+    }
+    notifyListeners();
+  });
+
+  socket.on('session_ended', (data: { message: string; leaderboard?: any }) => {
+    console.log('[useSocket] Session ended:', data);
+    globalCurrentQuestion = null;
+    globalTimeRemaining = null;
+    globalResults = null;
+    if (data.leaderboard) {
+      (socket as any).lastLeaderboard = data.leaderboard;
+    }
+    notifyListeners();
+  });
+
+  // Debug: log all events
+  socket.onAny((eventName, ...args) => {
+    if (eventName === 'question_started' || eventName === 'pre_countdown') {
+      console.log(`[useSocket] Received ${eventName} via onAny:`, args);
+    }
+  });
+
+  return socket;
+};
+
 interface UseSocketOptions {
   sessionCode?: string;
   autoConnect?: boolean;
@@ -13,151 +180,43 @@ interface UseSocketOptions {
 }
 
 export const useSocket = (options: UseSocketOptions = {}) => {
-  const { sessionCode, autoConnect = true, role = 'student' } = options;
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
-  const [participantCount, setParticipantCount] = useState(0);
-  const [participantNames, setParticipantNames] = useState<string[]>([]);
-  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-  const [results, setResults] = useState<QuestionInsight | null>(null);
+  const { autoConnect = true } = options;
+  
+  // Local state that syncs with global state
+  const [connected, setConnected] = useState(globalConnected);
+  const [participantCount, setParticipantCount] = useState(globalParticipantCount);
+  const [participantNames, setParticipantNames] = useState<string[]>(globalParticipantNames);
+  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(globalCurrentQuestion);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(globalTimeRemaining);
+  const [results, setResults] = useState<QuestionInsight | null>(globalResults);
+  const [preCountdown, setPreCountdown] = useState<number | null>(globalPreCountdown);
 
-  // Initialize socket connection once
+  // Initialize socket and subscribe to state changes
   useEffect(() => {
     if (!autoConnect) return;
 
-    // Only create socket if it doesn't exist
-    if (!socketRef.current) {
-      const socket = io(SOCKET_URL, {
-        transports: ['websocket'],
-        autoConnect: true,
-      });
+    // Initialize socket if not exists
+    initSocket();
 
-      socketRef.current = socket;
+    // Subscribe to state changes
+    const updateLocalState = () => {
+      setConnected(globalConnected);
+      setParticipantCount(globalParticipantCount);
+      setParticipantNames(globalParticipantNames);
+      setCurrentQuestion(globalCurrentQuestion);
+      setTimeRemaining(globalTimeRemaining);
+      setResults(globalResults);
+      setPreCountdown(globalPreCountdown);
+    };
 
-      // Connection events
-      socket.on('connect', () => {
-        console.log('Socket connected');
-        setConnected(true);
-      });
+    stateListeners.add(updateLocalState);
+    
+    // Sync initial state
+    updateLocalState();
 
-      // Listen for session joined confirmation
-      socket.on('session_joined', (data: any) => {
-        console.log('Session joined:', data);
-        // Emit custom event to notify components that session is ready
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('session_ready', { detail: data }));
-        }
-      });
-
-      socket.on('disconnect', () => {
-        console.log('Socket disconnected');
-        setConnected(false);
-      });
-
-      // Session events
-      // Backend sends aggregate participant counts and names via "participant_count"
-      socket.on('participant_count', (data: { count: number; names?: string[] }) => {
-        // Filter out any entries that look like internal IDs/UUIDs (lecturer user IDs)
-        const allNames = data.names || [];
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        const filteredNames = allNames.filter((name) => !uuidRegex.test(name));
-
-        console.log('Participant count updated (filtered):', filteredNames.length, filteredNames);
-
-        // Use filtered length as the source of truth for participant count on the frontend
-        setParticipantCount(filteredNames.length);
-        setParticipantNames(filteredNames);
-      });
-
-      const handleQuestionStarted = (data: any) => {
-        console.log('[useSocket] Question started event received:', data);
-        console.log('[useSocket] Current role:', role);
-        console.log('[useSocket] Current sessionCode:', sessionCode);
-        console.log('[useSocket] correctAnswer from backend:', data.correctAnswer, 'type:', typeof data.correctAnswer);
-        
-        // Warn if correctAnswer is missing
-        if (data.correctAnswer === null || data.correctAnswer === undefined) {
-          console.warn('[useSocket] WARNING: Question has no correctAnswer! The question needs to be edited and saved with a correct answer.');
-        }
-        
-        const question: Question = {
-          id: data.questionId,
-          sessionId: '', // not needed on client for now
-          question: data.question,
-          type: data.type,
-          options: data.options,
-          correctAnswer: data.correctAnswer !== undefined && data.correctAnswer !== null 
-            ? data.correctAnswer 
-            : null, // Explicitly null if missing
-          timerSeconds: data.timerSeconds,
-          order: data.order,
-          responses: [],
-          createdAt: new Date().toISOString(),
-        };
-        console.log('[useSocket] Setting currentQuestion with correctAnswer:', question.correctAnswer);
-        setCurrentQuestion(question);
-        setTimeRemaining(data.timerSeconds || null);
-        setResults(null);
-        console.log('[useSocket] State updated - question set');
-      };
-      
-      socket.on('question_started', handleQuestionStarted);
-      console.log('[useSocket] question_started listener attached for role:', role);
-      
-      // Also log all socket events for debugging
-      socket.onAny((eventName, ...args) => {
-        if (eventName === 'question_started') {
-          console.log('[useSocket] Received question_started via onAny:', args);
-        }
-      });
-
-      socket.on('timer_update', (data: { remaining: number }) => {
-        setTimeRemaining(data.remaining);
-      });
-
-      socket.on('timer_ended', () => {
-        console.log('Timer ended');
-        setTimeRemaining(0);
-      });
-
-      socket.on('response_submitted', (data: { responseCount: number }) => {
-        console.log('Response count:', data.responseCount);
-      });
-
-      socket.on('results_shown', (data: any) => {
-        console.log('[useSocket] Results shown event received:', data);
-        // Backend sends { questionId, insights, leaderboard }
-        // Extract the insights object which contains the QuestionInsight data
-        if (data.insights) {
-          console.log('[useSocket] Setting results from insights:', data.insights);
-          setResults(data.insights);
-        } else {
-          // Fallback: if data is already the insight object
-          console.log('[useSocket] Setting results directly from data:', data);
-          setResults(data);
-        }
-      });
-
-      socket.on('session_ended', (data: { message: string; leaderboard?: any }) => {
-        console.log('Session ended:', data);
-        setCurrentQuestion(null);
-        setTimeRemaining(null);
-        setResults(null);
-        // Store leaderboard data for dashboard
-        if (data.leaderboard) {
-          // Store in a way that can be accessed by the component
-          (socket as any).lastLeaderboard = data.leaderboard;
-        }
-      });
-    }
-
-    // Cleanup on unmount
+    // Cleanup: remove listener but DON'T disconnect socket
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
+      stateListeners.delete(updateLocalState);
     };
   }, [autoConnect]);
 
@@ -165,41 +224,64 @@ export const useSocket = (options: UseSocketOptions = {}) => {
   // Socket.IO is only used for receiving broadcasts
   // Components should use api.sessions.join() and api.responses.submit() instead
 
+  const emitPreCountdown = useCallback((sessionId: string, duration: number) => {
+    if (globalSocket) {
+      console.log('[useSocket] Emitting pre_countdown:', { sessionId, duration });
+      globalSocket.emit('pre_countdown', { sessionId, duration });
+    }
+  }, []);
+
   const startQuestion = useCallback((sessionId: string, questionId: string) => {
-    if (socketRef.current) {
-      socketRef.current.emit('start_question', { sessionId, questionId });
+    if (globalSocket) {
+      globalSocket.emit('start_question', { sessionId, questionId });
     }
   }, []);
 
   const showResults = useCallback((sessionId: string, questionId: string) => {
-    if (socketRef.current) {
-      socketRef.current.emit('show_results', { sessionId, questionId });
+    if (globalSocket) {
+      globalSocket.emit('show_results', { sessionId, questionId });
     }
   }, []);
 
   const endSession = useCallback((sessionId: string) => {
-    if (socketRef.current) {
-      socketRef.current.emit('end_session', { sessionId });
+    if (globalSocket) {
+      globalSocket.emit('end_session', { sessionId });
     }
+  }, []);
+
+  const clearQuestion = useCallback(() => {
+    console.log('[useSocket] Clearing question state');
+    globalCurrentQuestion = null;
+    globalTimeRemaining = null;
+    globalResults = null;
+    globalPreCountdown = null;
+    if (preCountdownInterval) {
+      clearInterval(preCountdownInterval);
+      preCountdownInterval = null;
+    }
+    notifyListeners();
   }, []);
 
   const disconnect = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
+    // Note: We don't actually disconnect the singleton socket
+    // This is intentional to maintain connection across page navigations
+    console.log('[useSocket] Disconnect called (no-op for singleton)');
   }, []);
 
   return {
-    socket: socketRef.current,
+    socket: globalSocket,
     connected,
     participantCount,
     participantNames,
     currentQuestion,
     timeRemaining,
     results,
+    preCountdown,
+    emitPreCountdown,
     startQuestion,
     showResults,
     endSession,
+    clearQuestion,
     disconnect,
   };
 };

@@ -27,6 +27,11 @@ interface EndSessionPayload {
   sessionId: string;
 }
 
+interface PreCountdownPayload {
+  sessionId: string;
+  duration: number;
+}
+
 @WebSocketGateway({
   cors: {
     origin: process.env.FRONTEND_URL || '*',
@@ -251,6 +256,27 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
 
     console.log(`[Socket.IO] Client ${socketId} joined session room ${sessionId} as ${participantInfo.role}`);
+  }
+
+  @SubscribeMessage('pre_countdown')
+  async handlePreCountdown(
+    @MessageBody() payload: PreCountdownPayload,
+    @ConnectedSocket() client: Socket,
+  ) {
+    try {
+      console.log(`[Socket.IO] Pre-countdown started for session ${payload.sessionId}, duration: ${payload.duration}s`);
+      
+      // Broadcast to all in session room (including sender)
+      this.server.to(payload.sessionId).emit('pre_countdown', {
+        duration: payload.duration,
+        startedAt: Date.now(),
+      });
+
+      return { success: true };
+    } catch (error) {
+      client.emit('error', { message: error.message });
+      return { success: false, error: error.message };
+    }
   }
 
   @SubscribeMessage('start_question')

@@ -12,7 +12,7 @@ export default function WaitingForQuizPage() {
 
   const router = useRouter();
   const [nickname, setNickname] = useState<string | null>(null);
-  const { socket, connected, currentQuestion } = useSocket({ autoConnect: true });
+  const { socket, connected, currentQuestion, preCountdown } = useSocket({ autoConnect: true });
   const hasJoined = useRef(false);
 
   useEffect(() => {
@@ -95,6 +95,21 @@ export default function WaitingForQuizPage() {
       socket.off('question_started', handler);
     };
   }, [socket, sessionId, router]);
+
+  // Show full-screen countdown when pre_countdown event is received
+  if (preCountdown !== null) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-rose-500 via-orange-400 to-amber-300 z-50 flex flex-col items-center justify-center">
+        <div className="text-center space-y-8">
+          <p className="text-2xl text-white/90 font-medium">Get Ready!</p>
+          <div className="w-48 h-48 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
+            <span className="text-9xl font-bold text-white">{preCountdown}</span>
+          </div>
+          <p className="text-xl text-white/80">Quiz starting soon...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-sky-100 p-4">

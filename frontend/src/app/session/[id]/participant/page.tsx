@@ -46,6 +46,7 @@ export default function ParticipantSessionPage() {
     currentQuestion,
     timeRemaining,
     results,
+    preCountdown,
     socket,
   } = useSocket({ sessionCode: session?.code, role: 'student', autoConnect: true });
 
@@ -345,6 +346,21 @@ export default function ParticipantSessionPage() {
         return null;
     }
   };
+
+  // Show full-screen countdown when pre_countdown event is received
+  if (preCountdown !== null && !currentQuestion) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-rose-500 via-orange-400 to-amber-300 z-50 flex flex-col items-center justify-center">
+        <div className="text-center space-y-8">
+          <p className="text-2xl text-white/90 font-medium">Get Ready!</p>
+          <div className="w-48 h-48 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
+            <span className="text-9xl font-bold text-white">{preCountdown}</span>
+          </div>
+          <p className="text-xl text-white/80">Quiz starting soon...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show dashboard if session ended
   if (sessionEnded && participantStats) {
