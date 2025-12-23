@@ -686,7 +686,7 @@ export default function ReportsPage() {
                                     )}
                                   </svg>
                                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <span className="text-sm font-semibold" style={{ transform: 'rotate(90deg)' }}>
+                                    <span className="text-sm font-semibold">
                                       {participant.correctPercentage}%
                                     </span>
                                   </div>
@@ -810,10 +810,10 @@ export default function ReportsPage() {
                             className="text-left p-3 font-semibold cursor-pointer hover:bg-gray-50"
                             onClick={() => handleSortQuestions('correct')}
                           >
-                            <div className="flex items-center gap-2">
-                              Correct/incorrect
-                              <span className="text-gray-400">↕</span>
-                            </div>
+                              <div className="flex items-center gap-2">
+                                Correct / Incorrect
+                                <span className="text-gray-400">↕</span>
+                              </div>
                           </th>
                         </tr>
                       </thead>
@@ -871,7 +871,7 @@ export default function ReportsPage() {
                                       )}
                                     </svg>
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                      <span className="text-xs font-semibold" style={{ transform: 'rotate(90deg)' }}>
+                                      <span className="text-xs font-semibold">
                                         {correctnessRate}%
                                       </span>
                                     </div>
