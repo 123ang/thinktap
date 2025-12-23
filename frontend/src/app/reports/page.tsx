@@ -164,6 +164,45 @@ export default function ReportsPage() {
     }
   };
 
+  const handleBulkRestore = async () => {
+    if (selectedReports.size === 0) return;
+
+    try {
+      await Promise.all(
+        Array.from(selectedReports).map((reportId) =>
+          api.sessions.restoreFromTrash(reportId),
+        ),
+      );
+      toast.success(t('reports.bulkRestoreSuccess'));
+      setSelectedReports(new Set());
+      loadReports();
+    } catch (error) {
+      console.error('Error restoring selected reports:', error);
+      toast.error(t('reports.bulkRestoreError'));
+    }
+  };
+
+  const handleBulkPermanentlyDelete = async () => {
+    if (selectedReports.size === 0) return;
+
+    const confirmed = window.confirm(t('reports.permanentDeleteConfirm'));
+    if (!confirmed) return;
+
+    try {
+      await Promise.all(
+        Array.from(selectedReports).map((reportId) =>
+          api.sessions.permanentlyDelete(reportId),
+        ),
+      );
+      toast.success(t('reports.bulkPermanentDeleteSuccess'));
+      setSelectedReports(new Set());
+      loadReports();
+    } catch (error) {
+      console.error('Error permanently deleting selected reports:', error);
+      toast.error(t('reports.bulkPermanentDeleteError'));
+    }
+  };
+
   const handleSelectReport = (reportId: string) => {
     const newSelected = new Set(selectedReports);
     if (newSelected.has(reportId)) {
@@ -455,16 +494,39 @@ export default function ReportsPage() {
                       </div>
                     </div>
                     {/* Bulk actions */}
-                    {view === 'all' && selectedReports.size > 0 && (
+                    {selectedReports.size > 0 && (
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleBulkMoveToTrash}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          {t('reports.bulkMoveLabel')}
-                        </Button>
+                        {view === 'all' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleBulkMoveToTrash}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            {t('reports.bulkMoveLabel')}
+                          </Button>
+                        )}
+                        {view === 'trash' && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleBulkRestore}
+                            >
+                              <RotateCcw className="h-4 w-4 mr-1" />
+                              {t('reports.bulkRestoreLabel')}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleBulkPermanentlyDelete}
+                              className="text-red-600 border-red-300 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              {t('reports.bulkPermanentDeleteLabel')}
+                            </Button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
