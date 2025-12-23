@@ -15,17 +15,6 @@ export class QuestionsService {
     userId: string,
     createQuestionDto: CreateQuestionDto,
   ) {
-    console.log('[QuestionsService] Creating question with DTO:', {
-      quizId,
-      type: createQuestionDto.type,
-      question: createQuestionDto.question,
-      options: createQuestionDto.options,
-      correctAnswer: createQuestionDto.correctAnswer,
-      correctAnswerType: typeof createQuestionDto.correctAnswer,
-      timerSeconds: createQuestionDto.timerSeconds,
-      order: createQuestionDto.order,
-    });
-
     // Verify quiz exists and user owns it
     const quiz = await this.prismaService.quiz.findUnique({
       where: { id: quizId },
@@ -136,10 +125,6 @@ export class QuestionsService {
   }
 
   async findOne(questionId: string) {
-    console.log(
-      '[QuestionsService] findOne called with questionId:',
-      questionId,
-    );
     const question = await this.prismaService.question.findUnique({
       where: { id: questionId },
       include: {
@@ -156,14 +141,6 @@ export class QuestionsService {
           },
         },
       },
-    });
-
-    console.log('[QuestionsService] Question from DB:', {
-      id: question?.id,
-      question: question?.question,
-      correctAnswer: question?.correctAnswer,
-      correctAnswerType: typeof question?.correctAnswer,
-      correctAnswerJSON: JSON.stringify(question?.correctAnswer),
     });
 
     if (!question) {

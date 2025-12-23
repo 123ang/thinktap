@@ -454,7 +454,10 @@ export default function ReportsPage() {
                           
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-lg mb-1">
-                              {report.quiz?.title || 'Untitled Quiz'}
+                              {report.quiz?.title || 'Untitled Quiz'}{' '}
+                              <span className="text-xs text-gray-500">
+                                ({report.id})
+                              </span>
                             </h3>
                             <div className="flex items-center gap-3 text-sm text-gray-600">
                               <Badge className="bg-green-100 text-green-800 border-green-200">
@@ -547,7 +550,10 @@ export default function ReportsPage() {
                   <div>
                     <h2 className="text-2xl font-bold">Participants</h2>
                     <p className="text-sm text-gray-600 mt-1">
-                      {selectedReport.quiz?.title || 'Untitled Quiz'}
+                      {selectedReport.quiz?.title || 'Untitled Quiz'}{' '}
+                      <span className="text-xs text-gray-500">
+                        ({selectedReport.id})
+                      </span>
                     </p>
                   </div>
                   <Button
@@ -714,7 +720,10 @@ export default function ReportsPage() {
                   <div>
                     <h2 className="text-2xl font-bold">Questions</h2>
                     <p className="text-sm text-gray-600 mt-1">
-                      {selectedReport.quiz?.title || 'Untitled Quiz'}
+                      {selectedReport.quiz?.title || 'Untitled Quiz'}{' '}
+                      <span className="text-xs text-gray-500">
+                        ({selectedReport.id})
+                      </span>
                     </p>
                   </div>
                   <Button

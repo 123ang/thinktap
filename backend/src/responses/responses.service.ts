@@ -562,14 +562,6 @@ export class ResponsesService {
   }
 
   async getTopRankings(sessionId: string, limit: number = 3) {
-    // Debug logging to verify we are using the correct sessionId and data
-    console.log(
-      '[ResponsesService.getTopRankings] Called with sessionId:',
-      sessionId,
-      'limit:',
-      limit,
-    );
-
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -597,19 +589,6 @@ export class ResponsesService {
         },
       },
     });
-
-    console.log(
-      '[ResponsesService.getTopRankings] Loaded responses count:',
-      allResponses.length,
-      'sample:',
-      allResponses.slice(0, 5).map((r) => ({
-        sessionId: r.sessionId,
-        userId: r.userId,
-        nickname: r.nickname,
-        points: r.points,
-        isCorrect: r.isCorrect,
-      })),
-    );
 
     // Group by participant (userId or nickname)
     const participantScores = new Map<
@@ -668,11 +647,6 @@ export class ResponsesService {
         points: entry.points,
         totalAnswered: entry.totalAnswered,
       }));
-
-    console.log(
-      '[ResponsesService.getTopRankings] Returning leaderboard:',
-      leaderboard,
-    );
 
     return leaderboard;
   }
@@ -801,13 +775,14 @@ export class ResponsesService {
       {
         userId: string | null;
         nickname: string | null;
-        responses: Array<{
-          questionId: string;
-          isCorrect: boolean | null;
-          points: number;
-        }>;
-        totalPoints: number;
-        correctCount: number;
+        // Best response per question for this participant
+        perQuestion: Record<
+          string,
+          {
+            isCorrect: boolean | null;
+            points: number;
+          }
+        >;
       }
     >();
 
@@ -817,73 +792,41 @@ export class ResponsesService {
         participantMap.set(key, {
           userId: response.userId,
           nickname: response.nickname,
-          responses: [],
-          totalPoints: 0,
-          correctCount: 0,
+          perQuestion: {},
         });
       }
 
       const participant = participantMap.get(key)!;
-      participant.responses.push({
-        questionId: response.questionId,
-        isCorrect: response.isCorrect,
-        points: response.points || 0,
-      });
-      // Only count points and correct answers from the latest response per question
-      // (in case of multiple responses, we want the best one)
-      const existingResponseIndex = participant.responses.findIndex(
-        (r) => r.questionId === response.questionId,
-      );
+      const existing = participant.perQuestion[response.questionId];
+      const points = response.points || 0;
 
-      if (existingResponseIndex >= 0) {
-        // Update if this response has more points
-        const existingResponse = participant.responses[existingResponseIndex];
-        if ((response.points || 0) > existingResponse.points) {
-          participant.totalPoints =
-            participant.totalPoints -
-            existingResponse.points +
-            (response.points || 0);
-          if (
-            existingResponse.isCorrect === true &&
-            response.isCorrect !== true
-          ) {
-            participant.correctCount--;
-          } else if (
-            existingResponse.isCorrect !== true &&
-            response.isCorrect === true
-          ) {
-            participant.correctCount++;
-          }
-          participant.responses[existingResponseIndex] = {
-            questionId: response.questionId,
-            isCorrect: response.isCorrect,
-            points: response.points || 0,
-          };
-        }
-      } else {
-        // New question response
-        participant.responses.push({
-          questionId: response.questionId,
+      // Keep only the best response per question (highest points)
+      if (!existing || points > existing.points) {
+        participant.perQuestion[response.questionId] = {
           isCorrect: response.isCorrect,
-          points: response.points || 0,
-        });
-        participant.totalPoints += response.points || 0;
-        if (response.isCorrect === true) {
-          participant.correctCount++;
-        }
+          points,
+        };
       }
     });
 
-    // Convert to array and calculate unanswered questions
+    // Convert to array and calculate unanswered questions and scores
     const participants = Array.from(participantMap.entries()).map(
       ([key, data]) => {
-        const answeredQuestionIds = new Set(
-          data.responses.map((r) => r.questionId),
+        const questionIds = Object.keys(data.perQuestion);
+        const answeredCount = questionIds.length;
+        const unansweredCount = totalQuestions - answeredCount;
+
+        const totalPoints = questionIds.reduce(
+          (sum, qid) => sum + (data.perQuestion[qid]?.points || 0),
+          0,
         );
-        const unansweredCount = totalQuestions - answeredQuestionIds.size;
+        const correctCount = questionIds.filter(
+          (qid) => data.perQuestion[qid]?.isCorrect === true,
+        ).length;
+
         const correctPercentage =
           totalQuestions > 0
-            ? Math.round((data.correctCount / totalQuestions) * 100)
+            ? Math.round((correctCount / totalQuestions) * 100)
             : 0;
 
         return {
@@ -893,11 +836,11 @@ export class ResponsesService {
           username:
             data.nickname ||
             `User ${data.userId?.substring(0, 8) || 'Unknown'}`,
-          correctCount: data.correctCount,
+          correctCount,
           unansweredCount,
           totalQuestions,
           correctPercentage,
-          finalScore: data.totalPoints,
+          finalScore: totalPoints,
         };
       },
     );

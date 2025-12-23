@@ -123,7 +123,9 @@ export class SessionsService {
         lecturerId: userId,
         status: SessionStatus.ENDED,
         endedAt: { not: null }, // Only include sessions that have actually ended
-        isDeleted: includeDeleted ? undefined : false,
+        // When includeDeleted is false (default \"All\" view), only show non-deleted reports.
+        // When includeDeleted is true (\"Trash\" view), only show items that were moved to trash.
+        isDeleted: includeDeleted ? true : false,
       },
       include: {
         quiz: {
