@@ -167,6 +167,15 @@ export interface QuestionInsight {
   slowestResponseMs?: number;
 }
 
+export interface RankingEntry {
+  rank: number;
+  userId?: string | null;
+  nickname?: string | null;
+  username: string;
+  points: number;
+  responseTimeMs: number;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   userId: string;

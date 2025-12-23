@@ -122,6 +122,79 @@ export class ResponsesService {
       question.correctAnswer,
     );
 
+    // Calculate streak for this participant
+    let streak = 0;
+    if (submitResponseDto.userId || submitResponseDto.nickname) {
+      // Build where clause for participant identification
+      const participantWhere: any = { sessionId };
+      if (submitResponseDto.userId) {
+        participantWhere.userId = submitResponseDto.userId;
+      } else {
+        // For anonymous participants, match by nickname and ensure userId is null
+        participantWhere.nickname = submitResponseDto.nickname;
+        participantWhere.userId = null;
+      }
+
+      // Get all previous responses for this participant in this session, ordered by question order
+      const previousResponses = await this.prismaService.response.findMany({
+        where: participantWhere,
+        include: {
+          question: {
+            select: { order: true },
+          },
+        },
+        orderBy: {
+          question: {
+            order: 'asc',
+          },
+        },
+      });
+
+      // Count consecutive correct answers from the end
+      for (let i = previousResponses.length - 1; i >= 0; i--) {
+        if (previousResponses[i].isCorrect === true) {
+          streak++;
+        } else {
+          break; // Streak breaks on incorrect answer
+        }
+      }
+    }
+
+    // If current answer is correct, add 1 to streak (we'll use this for multiplier calculation)
+    const currentStreak = isCorrect === true ? streak + 1 : 0;
+
+    // Calculate streak multiplier
+    // Streak Multiplier progression:
+    // < 3 correct: 1.0
+    // 3 correct: 1.1
+    // 4 correct: 1.2
+    // 5 correct: 1.3
+    // 6 correct: 1.4
+    // ... continues incrementing by 0.1
+    // ≥ 12 correct: 2.0 (cap at 2.0)
+    let streakMultiplier = 1.0;
+    if (currentStreak >= 3) {
+      // Increment by 0.1 for each correct answer after 2
+      // Formula: 1.0 + (currentStreak - 2) * 0.1, capped at 2.0
+      streakMultiplier = Math.min(2.0, 1.0 + (currentStreak - 2) * 0.1);
+    }
+
+    // Calculate points using the formula from quiz_scoring_system.md
+    // Score = round(BaseScore × SpeedFactor × StreakMultiplier × PowerUpMultiplier)
+    // BaseScore = 1000
+    // SpeedFactor = max(0, (T − t) / T)
+    // PowerUpMultiplier = 1.0 (no power-ups for now)
+    let points = 0;
+    if (isCorrect === true) {
+      const baseScore = 1000;
+      const totalTimeSeconds = question.timerSeconds || 30;
+      const timeTakenSeconds = submitResponseDto.responseTimeMs / 1000;
+      const speedFactor = Math.max(0, (totalTimeSeconds - timeTakenSeconds) / totalTimeSeconds);
+      const powerUpMultiplier = 1.0; // No power-ups implemented yet
+      
+      points = Math.round(baseScore * speedFactor * streakMultiplier * powerUpMultiplier);
+    }
+
     // For Seminar mode, userId should be null (anonymous)
     const userId =
       session.mode === SessionMode.SEMINAR ? null : submitResponseDto.userId;
@@ -135,6 +208,7 @@ export class ResponsesService {
         nickname: submitResponseDto.nickname || null,
         response: submitResponseDto.response,
         isCorrect,
+        points,
         responseTimeMs: submitResponseDto.responseTimeMs,
       },
     });
@@ -535,6 +609,224 @@ export class ResponsesService {
       }));
 
     return leaderboard;
+  }
+
+  async getQuestionRankings(questionId: string) {
+    const question = await this.prismaService.question.findUnique({
+      where: { id: questionId },
+    });
+
+    if (!question) {
+      throw new NotFoundException('Question not found');
+    }
+
+    // Get all correct responses for this question
+    const responses = await this.prismaService.response.findMany({
+      where: {
+        questionId,
+        isCorrect: true, // Only include correct answers in rankings
+      },
+      orderBy: {
+        submittedAt: 'asc',
+      },
+    });
+
+    // Group by participant (userId or nickname) and get best response for each
+    const participantResponses = new Map<string, {
+      userId: string | null;
+      nickname: string | null;
+      points: number;
+      responseTimeMs: number;
+    }>();
+
+    for (const response of responses) {
+      const key = response.userId || response.nickname || 'unknown';
+      
+      // Keep the best response per participant (highest points, or fastest if same points)
+      if (!participantResponses.has(key)) {
+        participantResponses.set(key, {
+          userId: response.userId,
+          nickname: response.nickname,
+          points: response.points,
+          responseTimeMs: response.responseTimeMs,
+        });
+      } else {
+        const existing = participantResponses.get(key)!;
+        // Update if this response has more points, or same points but faster
+        if (response.points > existing.points || 
+            (response.points === existing.points && response.responseTimeMs < existing.responseTimeMs)) {
+          participantResponses.set(key, {
+            userId: response.userId,
+            nickname: response.nickname,
+            points: response.points,
+            responseTimeMs: response.responseTimeMs,
+          });
+        }
+      }
+    }
+
+    // Convert to array and sort by points (desc) then by responseTimeMs (asc)
+    const rankings = Array.from(participantResponses.values())
+      .sort((a, b) => {
+        if (b.points !== a.points) {
+          return b.points - a.points;
+        }
+        return a.responseTimeMs - b.responseTimeMs;
+      })
+      .map((entry, index) => ({
+        rank: index + 1,
+        userId: entry.userId,
+        nickname: entry.nickname,
+        username: entry.nickname || `User ${entry.userId?.substring(0, 8) || 'Unknown'}`,
+        points: entry.points,
+        responseTimeMs: entry.responseTimeMs,
+      }));
+
+    return rankings;
+  }
+
+  async getSessionParticipants(sessionId: string) {
+    const session = await this.prismaService.session.findUnique({
+      where: { id: sessionId },
+      include: {
+        quiz: {
+          include: {
+            questions: {
+              orderBy: {
+                order: 'asc',
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!session || !session.quiz) {
+      throw new NotFoundException('Session not found');
+    }
+
+    const totalQuestions = session.quiz.questions.length;
+
+    // Get all responses for this session
+    const allResponses = await this.prismaService.response.findMany({
+      where: { sessionId },
+      include: {
+        question: {
+          select: {
+            id: true,
+            order: true,
+          },
+        },
+      },
+    });
+
+    // Group responses by participant (userId or nickname)
+    const participantMap = new Map<string, {
+      userId: string | null;
+      nickname: string | null;
+      responses: Array<{
+        questionId: string;
+        isCorrect: boolean | null;
+        points: number;
+      }>;
+      totalPoints: number;
+      correctCount: number;
+    }>();
+
+    allResponses.forEach((response) => {
+      const key = response.userId || response.nickname || 'unknown';
+      if (!participantMap.has(key)) {
+        participantMap.set(key, {
+          userId: response.userId,
+          nickname: response.nickname,
+          responses: [],
+          totalPoints: 0,
+          correctCount: 0,
+        });
+      }
+
+      const participant = participantMap.get(key)!;
+      participant.responses.push({
+        questionId: response.questionId,
+        isCorrect: response.isCorrect,
+        points: response.points || 0,
+      });
+      // Only count points and correct answers from the latest response per question
+      // (in case of multiple responses, we want the best one)
+      const existingResponseIndex = participant.responses.findIndex(
+        r => r.questionId === response.questionId
+      );
+      
+      if (existingResponseIndex >= 0) {
+        // Update if this response has more points
+        const existingResponse = participant.responses[existingResponseIndex];
+        if ((response.points || 0) > existingResponse.points) {
+          participant.totalPoints = participant.totalPoints - existingResponse.points + (response.points || 0);
+          if (existingResponse.isCorrect === true && response.isCorrect !== true) {
+            participant.correctCount--;
+          } else if (existingResponse.isCorrect !== true && response.isCorrect === true) {
+            participant.correctCount++;
+          }
+          participant.responses[existingResponseIndex] = {
+            questionId: response.questionId,
+            isCorrect: response.isCorrect,
+            points: response.points || 0,
+          };
+        }
+      } else {
+        // New question response
+        participant.responses.push({
+          questionId: response.questionId,
+          isCorrect: response.isCorrect,
+          points: response.points || 0,
+        });
+        participant.totalPoints += response.points || 0;
+        if (response.isCorrect === true) {
+          participant.correctCount++;
+        }
+      }
+    });
+
+    // Convert to array and calculate unanswered questions
+    const participants = Array.from(participantMap.entries()).map(([key, data]) => {
+      const answeredQuestionIds = new Set(data.responses.map(r => r.questionId));
+      const unansweredCount = totalQuestions - answeredQuestionIds.size;
+      const correctPercentage = totalQuestions > 0 
+        ? Math.round((data.correctCount / totalQuestions) * 100) 
+        : 0;
+
+      return {
+        identifier: key,
+        userId: data.userId,
+        nickname: data.nickname,
+        username: data.nickname || `User ${data.userId?.substring(0, 8) || 'Unknown'}`,
+        correctCount: data.correctCount,
+        unansweredCount,
+        totalQuestions,
+        correctPercentage,
+        finalScore: data.totalPoints,
+      };
+    });
+
+    // Sort by final score (descending) to assign ranks
+    participants.sort((a, b) => {
+      if (b.finalScore !== a.finalScore) {
+        return b.finalScore - a.finalScore;
+      }
+      // If same score, sort by correct count (descending)
+      return b.correctCount - a.correctCount;
+    });
+
+    // Assign ranks (handle ties)
+    let currentRank = 1;
+    participants.forEach((participant, index) => {
+      if (index > 0 && participants[index - 1].finalScore !== participant.finalScore) {
+        currentRank = index + 1;
+      }
+      participant['rank'] = currentRank;
+    });
+
+    return participants;
   }
 }
 

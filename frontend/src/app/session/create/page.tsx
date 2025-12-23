@@ -15,24 +15,14 @@ import { toast } from 'sonner';
 import api from '@/lib/api';
 import { SessionMode, QuestionType, CreateQuestionDto } from '@/types/api';
 import { ArrowLeft, Clock, Star, Trash2, CheckCircle2, Circle } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 type QuestionKind = 'MC_SINGLE' | 'MC_MULTI' | 'TRUE_FALSE';
 type PointsMode = 'STANDARD' | 'DOUBLE';
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const TIME_OPTIONS = [
-  { value: 5, label: '5 seconds' },
-  { value: 10, label: '10 seconds' },
-  { value: 15, label: '15 seconds' },
-  { value: 20, label: '20 seconds' },
-  { value: 30, label: '30 seconds' },
-  { value: 45, label: '45 seconds' },
-  { value: 60, label: '1 minute' },
-  { value: 90, label: '1 minute 30 seconds' },
-  { value: 120, label: '2 minutes' },
-  { value: 180, label: '3 minutes' },
-  { value: 240, label: '4 minutes' },
-];
+// Time options will be generated with translations in the component
 
 type SidebarQuestion = {
   id: string;
@@ -48,8 +38,23 @@ type SidebarQuestion = {
 function CreateSessionPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
 
   const [sessionId, setSessionId] = useState<string | null>(null);
+  
+  const TIME_OPTIONS = [
+    { value: 5, label: `5 ${t('builder.seconds')}` },
+    { value: 10, label: `10 ${t('builder.seconds')}` },
+    { value: 15, label: `15 ${t('builder.seconds')}` },
+    { value: 20, label: `20 ${t('builder.seconds')}` },
+    { value: 30, label: `30 ${t('builder.seconds')}` },
+    { value: 45, label: `45 ${t('builder.seconds')}` },
+    { value: 60, label: `1 ${t('builder.minute')}` },
+    { value: 90, label: `1 ${t('builder.minute')} 30 ${t('builder.seconds')}` },
+    { value: 120, label: `2 ${t('builder.minutes')}` },
+    { value: 180, label: `3 ${t('builder.minutes')}` },
+    { value: 240, label: `4 ${t('builder.minutes')}` },
+  ];
   const [sidebarQuestions, setSidebarQuestions] = useState<SidebarQuestion[]>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -85,7 +90,7 @@ function CreateSessionPageContent() {
         setSidebarQuestions([
           {
             id: draftId,
-            question: 'Untitled question',
+            question: t('builder.untitledQuestion'),
             type: QuestionType.MULTIPLE_CHOICE,
             options: ['', '', '', ''],
             timerSeconds: 20,
@@ -166,7 +171,7 @@ function CreateSessionPageContent() {
 
   const visibleOptions = (() => {
     if (questionKind === 'TRUE_FALSE') {
-      return ['True', 'False'];
+      return [t('builder.true'), t('builder.false')];
     }
     return options;
   })();
@@ -199,7 +204,7 @@ function CreateSessionPageContent() {
       // Ensure quiz exists
       let activeQuizId = sessionId;
       if (!activeQuizId) {
-        const quizTitle = title.trim() || 'Untitled Quiz';
+        const quizTitle = title.trim() || t('dashboard.untitledQuiz');
         const quiz = await api.quizzes.create({ title: quizTitle });
         activeQuizId = quiz.id;
         setSessionId(quiz.id);
@@ -219,7 +224,7 @@ function CreateSessionPageContent() {
         type = QuestionType.MULTIPLE_CHOICE;
       }
 
-      const finalOptions = questionKind === 'TRUE_FALSE' ? ['True', 'False'] : filledOptions;
+      const finalOptions = questionKind === 'TRUE_FALSE' ? [t('builder.true'), t('builder.false')] : filledOptions;
 
       let correctAnswer: any;
       if (type === QuestionType.MULTIPLE_SELECT) {
@@ -292,19 +297,19 @@ function CreateSessionPageContent() {
 
   const handleCreate = async () => {
     if (!question.trim()) {
-      toast.error('Please enter a question');
+      toast.error(t('builder.enterQuestion'));
       return;
     }
 
     const filledOptions = visibleOptions.map((o) => o.trim()).filter((o) => o.length > 0);
 
     if (questionKind !== 'TRUE_FALSE' && filledOptions.length < 2) {
-      toast.error('Please provide at least two answer options');
+      toast.error(t('builder.atLeastTwoOptions'));
       return;
     }
 
     if (correctIndexes.length === 0) {
-      toast.error('Please mark at least one correct answer');
+      toast.error(t('builder.markCorrectAnswer'));
       return;
     }
 
@@ -314,7 +319,7 @@ function CreateSessionPageContent() {
       let activeQuizId = sessionId; // Note: sessionId is actually used as quizId in this context
       if (!activeQuizId) {
         // Create a Quiz first (not a Session)
-        const quizTitle = title.trim() || 'Untitled Quiz';
+        const quizTitle = title.trim() || t('dashboard.untitledQuiz');
         const quiz = await api.quizzes.create({ title: quizTitle });
         activeQuizId = quiz.id;
         setSessionId(quiz.id); // Using sessionId state to store quizId
@@ -345,7 +350,7 @@ function CreateSessionPageContent() {
       }
 
       const finalOptions =
-        questionKind === 'TRUE_FALSE' ? ['True', 'False'] : filledOptions;
+        questionKind === 'TRUE_FALSE' ? [t('builder.true'), t('builder.false')] : filledOptions;
 
       // Store indices instead of text for correctAnswer
       let correctAnswer: any;
@@ -353,7 +358,7 @@ function CreateSessionPageContent() {
         correctAnswer = correctIndexes.filter((i) => i >= 0 && i < finalOptions.length);
         // Ensure we have at least one correct answer
         if (correctAnswer.length === 0) {
-          toast.error('Please select at least one correct answer');
+          toast.error(t('builder.selectAtLeastOneCorrect'));
           setLoading(false);
           return;
         }
@@ -361,7 +366,7 @@ function CreateSessionPageContent() {
         // For single select, ensure we have a valid index
         const selectedIndex = correctIndexes[0];
         if (selectedIndex === undefined || selectedIndex < 0 || selectedIndex >= finalOptions.length) {
-          toast.error('Please select a correct answer');
+          toast.error(t('builder.selectCorrectAnswer'));
           setLoading(false);
           return;
         }
@@ -376,7 +381,7 @@ function CreateSessionPageContent() {
           type,
           finalOptions,
         });
-        toast.error('Error: No correct answer selected. Please select a correct answer.');
+        toast.error(t('builder.selectCorrectAnswer'));
         setLoading(false);
         return;
       }
@@ -439,7 +444,7 @@ function CreateSessionPageContent() {
         type: typeof created.correctAnswer,
       });
 
-      toast.success('Question saved');
+      toast.success(t('builder.questionSaved'));
 
       // Always replace the selected question (whether draft or existing) with the saved version
       setSidebarQuestions((prev) => {
@@ -478,7 +483,7 @@ function CreateSessionPageContent() {
     } catch (error: any) {
       console.error('Error creating ThinkTap:', error);
       const message =
-        error?.response?.data?.message || 'Failed to add question';
+        error?.response?.data?.message || t('builder.failedAddQuestion');
       toast.error(message);
     } finally {
       setLoading(false);
@@ -486,7 +491,7 @@ function CreateSessionPageContent() {
   };
 
   const handleDeleteQuestion = async (questionId: string) => {
-    const confirmed = window.confirm('Remove this question from the quiz?');
+    const confirmed = window.confirm(t('builder.removeQuestion'));
     if (!confirmed) return;
 
     try {
@@ -514,7 +519,7 @@ function CreateSessionPageContent() {
           setQuestion(next.question);
           if (next.type === QuestionType.TRUE_FALSE) {
             setQuestionKind('TRUE_FALSE');
-            setOptions(['True', 'False']);
+            setOptions([t('builder.true'), t('builder.false')]);
           } else if (next.type === QuestionType.MULTIPLE_SELECT) {
             setQuestionKind('MC_MULTI');
             setOptions(next.options && next.options.length ? next.options : ['', '', '', '']);
@@ -534,7 +539,7 @@ function CreateSessionPageContent() {
       }
     } catch (error) {
       console.error('Error deleting question:', error);
-      toast.error('Failed to remove question');
+      toast.error(t('builder.failedRemove'));
     }
   };
 
@@ -607,7 +612,7 @@ function CreateSessionPageContent() {
           // hydrate editor from first question
           if (first.type === QuestionType.TRUE_FALSE) {
             setQuestionKind('TRUE_FALSE');
-            setOptions(['True', 'False']);
+            setOptions([t('builder.true'), t('builder.false')]);
           } else if (first.type === QuestionType.MULTIPLE_SELECT) {
             setQuestionKind('MC_MULTI');
             setOptions(first.options && first.options.length ? first.options : ['', '', '', '']);
@@ -656,7 +661,7 @@ function CreateSessionPageContent() {
             // Show a warning toast to the user
             if (typeof window !== 'undefined') {
               setTimeout(() => {
-                toast.warning('This question has no correct answer set. Please select the correct answer and save.');
+                toast.warning(t('builder.noCorrectAnswerWarning'));
               }, 500);
             }
           }
@@ -684,12 +689,12 @@ function CreateSessionPageContent() {
               <Link href="/dashboard">
                 <Button variant="ghost" size="sm">
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
+                  {t('builder.back')}
                 </Button>
               </Link>
               <div className="flex flex-col gap-1">
                 <Input
-                  placeholder="Enter ThinkTap title..."
+                  placeholder={t('builder.titlePlaceholder')}
                   value={title}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -702,25 +707,28 @@ function CreateSessionPageContent() {
                   className="h-9 text-sm"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Short interactive lessons with quizzes.
+                  {t('builder.thinktapDesc')}
                 </p>
               </div>
             </div>
-            <Button
-              size="sm"
-              className="bg-green-600 hover:bg-green-700 text-white"
-              onClick={handleCreate}
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Spinner size="sm" className="mr-2" />
-                  Saving...
-                </>
-              ) : (
-                'Save'
-              )}
-            </Button>
+            <div className="flex items-center gap-3">
+              <LanguageSwitcher />
+              <Button
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={handleCreate}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Spinner size="sm" className="mr-2" />
+                    {t('builder.saving')}
+                  </>
+                ) : (
+                  t('builder.save')
+                )}
+              </Button>
+            </div>
           </div>
         </header>
 
@@ -729,16 +737,16 @@ function CreateSessionPageContent() {
           {/* Left column: question list */}
           <Card className="shadow-md lg:col-span-1 h-fit">
             <CardHeader className="space-y-2 pb-3">
-              <CardTitle className="text-sm">Quiz</CardTitle>
+              <CardTitle className="text-sm">{t('builder.quiz')}</CardTitle>
               <CardDescription className="text-xs">
-                Questions in this quiz
+                {t('builder.questionsInQuiz')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-3">
                 {sidebarQuestions.length === 0 && (
                   <p className="text-xs text-muted-foreground">
-                    No questions yet. Use the editor on the right, then press <span className="font-medium">Save</span>.
+                    {t('builder.noQuestions')} <span className="font-medium">{t('builder.saveButton')}</span>.
                   </p>
                 )}
                 {sidebarQuestions.map((q, index) => (
@@ -753,7 +761,7 @@ function CreateSessionPageContent() {
 
                       if (q.type === QuestionType.TRUE_FALSE) {
                         setQuestionKind('TRUE_FALSE');
-                        setOptions(['True', 'False']);
+                        setOptions([t('builder.true'), t('builder.false')]);
                       } else if (q.type === QuestionType.MULTIPLE_SELECT) {
                         setQuestionKind('MC_MULTI');
                         setOptions(q.options && q.options.length ? q.options : ['', '', '', '']);
@@ -799,12 +807,12 @@ function CreateSessionPageContent() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="text-[11px] font-semibold text-muted-foreground mb-1">
-                          {index + 1}. {q.question?.trim() || 'Untitled question'}
+                          {index + 1}. {q.question?.trim() || t('builder.untitledQuestion')}
                         </p>
                         <p className="text-[11px] text-gray-500">
                           {q.type === QuestionType.TRUE_FALSE
-                            ? 'True / False'
-                            : 'Multiple choice'}
+                            ? t('builder.trueFalseLabel')
+                            : t('builder.multipleChoice')}
                         </p>
                       </div>
                       <Button
@@ -822,9 +830,9 @@ function CreateSessionPageContent() {
                       </Button>
                     </div>
                     <div className="mt-1 flex items-center justify-between">
-                      <span className="text-[11px] text-gray-400">Question</span>
+                      <span className="text-[11px] text-gray-400">{t('builder.question')}</span>
                       <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[10px] font-medium text-amber-700">
-                        {q.pointsMode === 'DOUBLE' ? '40 pts' : '20 pts'}
+                        {q.pointsMode === 'DOUBLE' ? `40 ${t('builder.pts')}` : `20 ${t('builder.pts')}`}
                       </span>
                     </div>
                   </div>
@@ -852,7 +860,7 @@ function CreateSessionPageContent() {
                       ...prev,
                       {
                         id: draftId,
-                        question: 'Untitled question',
+                        question: t('builder.untitledQuestion'),
                         type: QuestionType.MULTIPLE_CHOICE,
                         isDraft: true,
                         pointsMode: 'STANDARD',
@@ -860,7 +868,7 @@ function CreateSessionPageContent() {
                     ]);
                   }}
                 >
-                  + Add
+                  {t('builder.add')}
                 </Button>
               </div>
             </CardContent>
@@ -874,11 +882,11 @@ function CreateSessionPageContent() {
                   htmlFor="question"
                   className="text-xs uppercase tracking-wide text-muted-foreground"
                 >
-                  Quiz question
+                  {t('builder.quizQuestion')}
                 </Label>
                 <Input
                   id="question"
-                  placeholder="Start typing your question"
+                  placeholder={t('builder.questionPlaceholder')}
                   value={question}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -918,7 +926,7 @@ function CreateSessionPageContent() {
                           {letter}
                         </div>
                         <Input
-                          placeholder={`Add answer ${index + 1}${index >= 2 ? ' (optional)' : ''}`}
+                          placeholder={`${t('builder.addAnswerPlaceholder')} ${index + 1}${index >= 2 ? ` ${t('builder.optional')}` : ''}`}
                           value={questionKind === 'TRUE_FALSE' ? option : option}
                           onChange={(e) =>
                             questionKind === 'TRUE_FALSE'
@@ -948,7 +956,7 @@ function CreateSessionPageContent() {
                       size="sm"
                       onClick={handleAddOption}
                     >
-                      + Add more answers
+                      {t('builder.addAnswer')}
                     </Button>
                   </div>
                 )}
@@ -958,7 +966,7 @@ function CreateSessionPageContent() {
               <div className="space-y-4">
                 <div>
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Question type
+                    {t('builder.questionType')}
                   </Label>
                   <Select
                     value={questionKind}
@@ -988,9 +996,9 @@ function CreateSessionPageContent() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="MC_SINGLE">Multiple choice • Single select</SelectItem>
-                      <SelectItem value="MC_MULTI">Multiple choice • Multiple select</SelectItem>
-                      <SelectItem value="TRUE_FALSE">True / False</SelectItem>
+                      <SelectItem value="MC_SINGLE">{t('builder.mcSingle')}</SelectItem>
+                      <SelectItem value="MC_MULTI">{t('builder.mcMulti')}</SelectItem>
+                      <SelectItem value="TRUE_FALSE">{t('builder.trueFalse')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -998,7 +1006,7 @@ function CreateSessionPageContent() {
                 <div>
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    Time limit (seconds)
+                    {t('builder.timeLimit')}
                   </Label>
                   <Select
                     value={String(timeLimit)}
@@ -1024,7 +1032,7 @@ function CreateSessionPageContent() {
                 <div>
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
                     <Star className="h-3 w-3" />
-                    Points
+                    {t('builder.points')}
                   </Label>
                   <Select
                     value={pointsMode}
@@ -1037,8 +1045,8 @@ function CreateSessionPageContent() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="STANDARD">Standard</SelectItem>
-                      <SelectItem value="DOUBLE">Double points</SelectItem>
+                      <SelectItem value="STANDARD">{t('builder.standard')}</SelectItem>
+                      <SelectItem value="DOUBLE">{t('builder.double')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1050,7 +1058,7 @@ function CreateSessionPageContent() {
                     className="w-full mt-2"
                     onClick={() => router.push(`/session/${sessionId}`)}
                   >
-                    Go to quiz overview
+                    {t('builder.goToOverview')}
                   </Button>
                 )}
               </div>

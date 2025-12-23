@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Patch, Body, Param, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
 import { CreateSessionDto } from './dto/session.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -77,6 +77,30 @@ export class SessionsController {
   @UseGuards(JwtAuthGuard)
   async delete(@Param('id') id: string, @Request() req) {
     return this.sessionsService.delete(id, req.user.id);
+  }
+
+  @Get('reports')
+  @UseGuards(JwtAuthGuard)
+  async findAllReports(@Request() req, @Query('includeDeleted') includeDeleted?: string) {
+    return this.sessionsService.findAllReports(req.user.id, includeDeleted === 'true');
+  }
+
+  @Post(':id/trash')
+  @UseGuards(JwtAuthGuard)
+  async moveToTrash(@Param('id') id: string, @Request() req) {
+    return this.sessionsService.moveToTrash(id, req.user.id);
+  }
+
+  @Post(':id/restore')
+  @UseGuards(JwtAuthGuard)
+  async restoreFromTrash(@Param('id') id: string, @Request() req) {
+    return this.sessionsService.restoreFromTrash(id, req.user.id);
+  }
+
+  @Delete(':id/permanent')
+  @UseGuards(JwtAuthGuard)
+  async permanentlyDelete(@Param('id') id: string, @Request() req) {
+    return this.sessionsService.permanentlyDelete(id, req.user.id);
   }
 }
 

@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -17,6 +19,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { register, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
 
   // Redirect if already authenticated
@@ -33,11 +36,11 @@ export default function RegisterPage() {
 
   const validatePassword = () => {
     if (password.length < 8) {
-      toast.error('Password must be at least 8 characters long');
+      toast.error(t('register.passwordTooShort'));
       return false;
     }
     if (password !== confirmPassword) {
-      toast.error('Passwords do not match');
+      toast.error(t('register.passwordsDontMatch'));
       return false;
     }
     return true;
@@ -47,7 +50,7 @@ export default function RegisterPage() {
     e.preventDefault();
     
     if (!email || !password || !confirmPassword) {
-      toast.error('Please fill in all fields');
+      toast.error(t('login.fillAllFields'));
       return;
     }
 
@@ -59,11 +62,11 @@ export default function RegisterPage() {
 
     try {
       await register({ email, password });
-      toast.success('Account created successfully!');
+      toast.success(t('register.success'));
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Registration error:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to create account';
+      const errorMessage = error.response?.data?.message || t('register.failed');
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -72,23 +75,26 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-100 p-4">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
-            Create Your Account
+            {t('register.title')}
           </CardTitle>
           <CardDescription className="text-center">
-            Start creating interactive learning sessions
+            {t('register.subtitle')}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('login.email')}</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="lecturer@university.edu"
+                placeholder={t('login.emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
@@ -96,7 +102,7 @@ export default function RegisterPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('login.password')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -108,11 +114,11 @@ export default function RegisterPage() {
                 minLength={8}
               />
               <p className="text-xs text-muted-foreground">
-                Must be at least 8 characters long
+                {t('register.passwordHint')}
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword">{t('register.confirmPassword')}</Label>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -125,13 +131,13 @@ export default function RegisterPage() {
               />
             </div>
             <div className="text-xs text-muted-foreground">
-              By creating an account, you agree to our{' '}
-              <Link href="/terms" className="text-red-600 hover:underline">
-                Terms of Service
+              {t('register.terms')}{' '}
+              <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline">
+                {t('register.termsLink')}
               </Link>{' '}
-              and{' '}
-              <Link href="/privacy" className="text-red-600 hover:underline">
-                Privacy Policy
+              {t('register.and')}{' '}
+              <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline">
+                {t('register.privacyLink')}
               </Link>
             </div>
           </CardContent>
@@ -144,19 +150,19 @@ export default function RegisterPage() {
               {loading ? (
                 <>
                   <Spinner size="sm" className="mr-2" />
-                  Creating account...
+                  {t('register.creating')}
                 </>
               ) : (
-                'Create Account'
+                t('register.createAccount')
               )}
             </Button>
             <div className="text-sm text-center text-muted-foreground">
-              Already have an account?{' '}
+              {t('register.haveAccount')}{' '}
               <Link 
                 href="/login" 
                 className="text-red-600 hover:underline font-medium"
               >
-                Sign in
+                {t('register.signIn')}
               </Link>
             </div>
           </CardFooter>

@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { AuthResponse } from '@/types/api';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4004/api';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -127,28 +127,68 @@ class ApiClient {
 
   // Helper methods for common HTTP operations
   async get<T>(url: string, config?: any): Promise<T> {
-    const response = await this.client.get<T>(url, config);
-    return response.data;
+    try {
+      const response = await this.client.get<T>(url, config);
+      return response.data;
+    } catch (error: any) {
+      // Handle network errors specifically
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        throw new Error('Unable to connect to server. Please check if the backend is running.');
+      }
+      throw error;
+    }
   }
 
   async post<T>(url: string, data?: any, config?: any): Promise<T> {
-    const response = await this.client.post<T>(url, data, config);
-    return response.data;
+    try {
+      const response = await this.client.post<T>(url, data, config);
+      return response.data;
+    } catch (error: any) {
+      // Handle network errors specifically
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        throw new Error('Unable to connect to server. Please check if the backend is running.');
+      }
+      throw error;
+    }
   }
 
   async put<T>(url: string, data?: any, config?: any): Promise<T> {
-    const response = await this.client.put<T>(url, data, config);
-    return response.data;
+    try {
+      const response = await this.client.put<T>(url, data, config);
+      return response.data;
+    } catch (error: any) {
+      // Handle network errors specifically
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        throw new Error('Unable to connect to server. Please check if the backend is running.');
+      }
+      throw error;
+    }
   }
 
   async patch<T>(url: string, data?: any, config?: any): Promise<T> {
-    const response = await this.client.patch<T>(url, data, config);
-    return response.data;
+    try {
+      const response = await this.client.patch<T>(url, data, config);
+      return response.data;
+    } catch (error: any) {
+      // Handle network errors specifically
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        throw new Error('Unable to connect to server. Please check if the backend is running.');
+      }
+      throw error;
+    }
   }
 
   async delete<T>(url: string, config?: any): Promise<T> {
-    const response = await this.client.delete<T>(url, config);
-    return response.data;
+    try {
+      const response = await this.client.delete<T>(url, config);
+      return response.data;
+    } catch (error: any) {
+      // Handle network errors specifically
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        throw new Error('Unable to connect to server. Please check if the backend is running.');
+      }
+      throw error;
+    }
   }
 
   // Auth helper methods

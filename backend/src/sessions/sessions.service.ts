@@ -117,6 +117,61 @@ export class SessionsService {
     return sessions;
   }
 
+  async findAllReports(userId: string, includeDeleted: boolean = false) {
+    const sessions = await this.prismaService.session.findMany({
+      where: {
+        lecturerId: userId,
+        status: SessionStatus.ENDED,
+        isDeleted: includeDeleted ? undefined : false,
+      },
+      include: {
+        quiz: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        _count: {
+          select: {
+            responses: true,
+          },
+        },
+      },
+      orderBy: {
+        endedAt: 'desc',
+      },
+    });
+
+    // Calculate unique participant count for each session
+    const reportsWithParticipantCount = await Promise.all(
+      sessions.map(async (session) => {
+        // Get unique participants (by userId or nickname)
+        const participants = await this.prismaService.response.findMany({
+          where: { sessionId: session.id },
+          select: {
+            userId: true,
+            nickname: true,
+          },
+          distinct: ['userId', 'nickname'],
+        });
+
+        // Count unique participants (filter out nulls and duplicates)
+        const uniqueParticipants = new Set<string>();
+        participants.forEach((p) => {
+          const key = p.userId || p.nickname || '';
+          if (key) uniqueParticipants.add(key);
+        });
+
+        return {
+          ...session,
+          participantCount: uniqueParticipants.size,
+        };
+      }),
+    );
+
+    return reportsWithParticipantCount;
+  }
+
   async findOne(sessionId: string, userId?: string) {
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
@@ -240,6 +295,81 @@ export class SessionsService {
     await this.sessionStateService.deleteSessionState(sessionId);
 
     return { message: 'Session deleted successfully' };
+  }
+
+  async moveToTrash(sessionId: string, userId: string) {
+    const session = await this.prismaService.session.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+
+    if (session.lecturerId !== userId) {
+      throw new ForbiddenException('Only the lecturer can delete the session');
+    }
+
+    const updated = await this.prismaService.session.update({
+      where: { id: sessionId },
+      data: {
+        isDeleted: true,
+        deletedAt: new Date(),
+      },
+    });
+
+    return { message: 'Report moved to trash', session: updated };
+  }
+
+  async restoreFromTrash(sessionId: string, userId: string) {
+    const session = await this.prismaService.session.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+
+    if (session.lecturerId !== userId) {
+      throw new ForbiddenException('Only the lecturer can restore the session');
+    }
+
+    const updated = await this.prismaService.session.update({
+      where: { id: sessionId },
+      data: {
+        isDeleted: false,
+        deletedAt: null,
+      },
+    });
+
+    return { message: 'Report restored', session: updated };
+  }
+
+  async permanentlyDelete(sessionId: string, userId: string) {
+    const session = await this.prismaService.session.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+
+    if (session.lecturerId !== userId) {
+      throw new ForbiddenException('Only the lecturer can delete the session');
+    }
+
+    if (!session.isDeleted) {
+      throw new BadRequestException('Session must be in trash before permanent deletion');
+    }
+
+    await this.prismaService.session.delete({
+      where: { id: sessionId },
+    });
+
+    // Also delete session state from Redis
+    await this.sessionStateService.deleteSessionState(sessionId);
+
+    return { message: 'Report permanently deleted' };
   }
 
   async joinSession(

@@ -1,26 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
 
   // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, router]);
+  
   if (isAuthenticated) {
-    router.push('/dashboard');
     return null;
   }
 
@@ -28,7 +36,7 @@ export default function LoginPage() {
     e.preventDefault();
     
     if (!email || !password) {
-      toast.error('Please fill in all fields');
+      toast.error(t('login.fillAllFields'));
       return;
     }
 
@@ -36,11 +44,11 @@ export default function LoginPage() {
 
     try {
       await login({ email, password });
-      toast.success('Logged in successfully!');
+      toast.success(t('login.success'));
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.message || 'Invalid email or password';
+      const errorMessage = error.response?.data?.message || t('login.invalidCredentials');
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -49,23 +57,26 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-100 p-4">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
-            Welcome to ThinkTap
+            {t('login.title')}
           </CardTitle>
           <CardDescription className="text-center">
-            Sign in to your account to continue
+            {t('login.subtitle')}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('login.email')}</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="lecturer@university.edu"
+                placeholder={t('login.emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
@@ -73,7 +84,7 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('login.password')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -89,7 +100,7 @@ export default function LoginPage() {
                 href="/forgot-password" 
                 className="text-sm text-red-600 hover:underline"
               >
-                Forgot password?
+                {t('login.forgotPassword')}
               </Link>
             </div>
           </CardContent>
@@ -102,19 +113,19 @@ export default function LoginPage() {
               {loading ? (
                 <>
                   <Spinner size="sm" className="mr-2" />
-                  Signing in...
+                  {t('login.signingIn')}
                 </>
               ) : (
-                'Sign In'
+                t('login.signIn')
               )}
             </Button>
             <div className="text-sm text-center text-muted-foreground">
-              Don't have an account?{' '}
+              {t('login.noAccount')}{' '}
               <Link 
                 href="/register" 
                 className="text-red-600 hover:underline font-medium"
               >
-                Sign up
+                {t('login.signUp')}
               </Link>
             </div>
           </CardFooter>

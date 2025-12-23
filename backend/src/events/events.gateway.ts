@@ -366,6 +366,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         (q) => q.questionId === payload.questionId,
       );
 
+      // Get rankings for this question
+      const rankings = await this.responsesService.getQuestionRankings(payload.questionId);
+
       // Update session state
       await this.sessionStateService.showResults(payload.sessionId);
 
@@ -374,6 +377,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         questionId: payload.questionId,
         insights: questionInsights,
         leaderboard: insights['leaderboard'] || null,
+        rankings: rankings,
       });
 
       return { success: true };

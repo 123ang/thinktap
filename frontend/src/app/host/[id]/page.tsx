@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Spinner } from '@/components/ui/spinner';
 import api from '@/lib/api';
 import { Session, Quiz, SessionMode } from '@/types/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function HostLobbyPage() {
   const params = useParams();
   const router = useRouter();
   const quizId = params.id as string;
+  const { t } = useLanguage();
 
   const [session, setSession] = useState<Session | null>(null);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -78,10 +80,10 @@ export default function HostLobbyPage() {
       <Card className="max-w-xl w-full bg-rose-50/95 border border-rose-200 shadow-2xl">
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl font-semibold text-rose-900">
-            {title || 'Host ThinkTap'}
+            {title || t('host.title')}
           </CardTitle>
           <CardDescription className="text-sm text-rose-700">
-            When you press start, a colorful lobby will open with a game PIN and QR code so students can join.
+            {t('host.description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex justify-end">
@@ -90,7 +92,7 @@ export default function HostLobbyPage() {
             onClick={handleStart}
             className="px-8 bg-rose-600 hover:bg-rose-700 text-rose-50"
           >
-            Start
+            {t('host.start')}
           </Button>
         </CardContent>
       </Card>

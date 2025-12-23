@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Podium } from '@/components/Podium';
+import { Scoreboard } from '@/components/Scoreboard';
 import {
   Dialog,
   DialogContent,
@@ -36,12 +37,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export default function LecturerSessionPage() {
   const params = useParams();
   const router = useRouter();
   const sessionId = params.id as string;
   const { user } = useAuth();
+  const { t } = useLanguage();
   
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,6 +67,7 @@ export default function LecturerSessionPage() {
     currentQuestion,
     timeRemaining,
     results,
+    rankings,
     preCountdown,
     emitPreCountdown,
     startQuestion,
@@ -120,7 +125,7 @@ export default function LecturerSessionPage() {
   // Listen for question started confirmation to show toast
   useEffect(() => {
     const handleQuestionStarted = () => {
-      toast.success('Question started!');
+      toast.success(t('lecturer.questionStarted'));
     };
     
     if (typeof window !== 'undefined') {
@@ -140,9 +145,8 @@ export default function LecturerSessionPage() {
     if (storedTitle) {
       setQuizTitle(storedTitle);
     }
-    // Build join URL for QR code
-    const origin = window.location.origin;
-    setJoinUrl(`${origin}/session/${sessionId}/join`);
+    // Build join URL for QR code - use the generic join page
+    setJoinUrl('https://thinktap.link/session/join');
   }, [sessionId]);
 
   const loadSession = async () => {
@@ -156,7 +160,7 @@ export default function LecturerSessionPage() {
       }
     } catch (error) {
       console.error('Error loading session:', error);
-      toast.error('Failed to load session');
+      toast.error(t('lecturer.failedLoad'));
       router.push('/dashboard');
     } finally {
       setLoading(false);
@@ -170,7 +174,7 @@ export default function LecturerSessionPage() {
       setQuestions(data);
     } catch (error) {
       console.error('Error loading questions:', error);
-      toast.error('Failed to load questions');
+      toast.error(t('lecturer.failedLoadQuestions'));
     } finally {
       setQuestionsLoading(false);
     }
@@ -180,7 +184,7 @@ export default function LecturerSessionPage() {
     if (session) {
       navigator.clipboard.writeText(session.code);
       setCodeCopied(true);
-      toast.success('Session code copied!');
+      toast.success(t('lecturer.codeCopied'));
       setTimeout(() => setCodeCopied(false), 2000);
     }
   };
@@ -191,9 +195,9 @@ export default function LecturerSessionPage() {
       clearQuestion();
       await api.sessions.updateStatus(sessionId, 'ACTIVE');
       await loadSession();
-      toast.success('Session started!');
+      toast.success(t('lecturer.sessionStarted'));
     } catch (error) {
-      toast.error('Failed to start session');
+      toast.error(t('lecturer.failedStart'));
     }
   };
 
@@ -219,11 +223,11 @@ export default function LecturerSessionPage() {
         // Still show podium even if rankings fail, but with empty rankings
         setTopRankings([]);
         setShowPodium(true);
-        toast.warning('Could not load rankings, but session ended successfully');
+        toast.warning(t('lecturer.rankingsLoadWarning'));
       }
     } catch (error) {
       console.error('Error ending session:', error);
-      toast.error('Failed to end session');
+      toast.error(t('lecturer.failedEndSession'));
     }
   };
 
@@ -233,7 +237,7 @@ export default function LecturerSessionPage() {
 
   const handleStartQuestion = (questionId: string) => {
     if (!connected) {
-      toast.error('Not connected. Please wait...');
+      toast.error(t('lecturer.notConnected'));
       return;
     }
 
@@ -290,21 +294,21 @@ export default function LecturerSessionPage() {
           <div className="w-full max-w-5xl space-y-6">
             <Card className="bg-white/95 backdrop-blur shadow-2xl">
               <CardHeader className="text-center pb-4">
-                <CardTitle className="text-4xl font-bold mb-2">Session Complete!</CardTitle>
-                <CardDescription className="text-xl">Top 3 Performers</CardDescription>
+                <CardTitle className="text-4xl font-bold mb-2">{t('lecturer.sessionComplete')}</CardTitle>
+                <CardDescription className="text-xl">{t('lecturer.topPerformers')}</CardDescription>
               </CardHeader>
               <CardContent>
                 {topRankings.length > 0 ? (
                   <Podium rankings={topRankings} />
                 ) : (
                   <div className="text-center py-12 text-gray-500">
-                    No rankings available yet
+                    {t('lecturer.noRankingsAvailable')}
                   </div>
                 )}
                 <div className="mt-8 text-center">
                   <Button onClick={handleBackToDashboard} size="lg" className="px-8">
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Dashboard
+                    {t('lecturer.backToDashboard')}
                   </Button>
                 </div>
               </CardContent>
@@ -335,36 +339,37 @@ export default function LecturerSessionPage() {
           <div className="container mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link href="/dashboard">
-                <Button
+                  <Button
                   variant="ghost"
                   size="sm"
                   className="text-rose-50 hover:bg-rose-600/40 hover:text-rose-50"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
+                  {t('lecturer.back')}
                 </Button>
               </Link>
               <div>
                 <div className="flex items-center gap-3">
                   <h1 className="text-2xl font-bold pb-1">
-                    {quizTitle || `Quiz ${session.code}`}
+                    {quizTitle || `${t('lecturer.quiz')} ${session.code}`}
                   </h1>
                   <SessionStatus status={session.status} />
                   <ModeStatus mode={session.mode} />
                 </div>
                 <p className="text-sm text-rose-50/90">
-                  {connected ? 'Connected' : 'Disconnected'} • {participantCount} participants
+                  {connected ? t('lecturer.connected') : t('lecturer.disconnected')} • {participantCount} {participantCount === 1 ? t('lecturer.participant') : t('lecturer.participants')}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <LanguageSwitcher />
               {session.status === 'CREATED' && (
                 <Button
                   onClick={handleStartSession}
                   className="bg-emerald-500 hover:bg-emerald-600 text-emerald-50"
                 >
                   <Play className="mr-2 h-4 w-4" />
-                  Start Session
+                  {t('lecturer.startSession')}
                 </Button>
               )}
               {session.status === 'ACTIVE' && (
@@ -374,7 +379,7 @@ export default function LecturerSessionPage() {
                   className="bg-rose-800 hover:bg-rose-900 text-rose-50"
                 >
                   <Square className="mr-2 h-4 w-4" />
-                  End Session
+                  {t('lecturer.endSession')}
                 </Button>
               )}
               {session.status === 'ENDED' && user?.plan !== 'FREE' && (
@@ -384,7 +389,7 @@ export default function LecturerSessionPage() {
                     className="bg-amber-50 text-amber-900 hover:bg-amber-100 border-amber-300"
                   >
                     <BarChart className="mr-2 h-4 w-4" />
-                    View Insights
+                    {t('lecturer.viewInsights')}
                   </Button>
                 </Link>
               )}
@@ -398,7 +403,7 @@ export default function LecturerSessionPage() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 rounded-2xl bg-white/95 border border-rose-100 px-6 py-4 shadow">
             <div>
               <p className="text-xs uppercase tracking-wide text-rose-500 font-semibold">
-                Game PIN
+                {t('lecturer.gamePin')}
               </p>
               <p className="text-3xl md:text-4xl font-mono font-bold text-rose-700">
                 {session.code}
@@ -411,12 +416,12 @@ export default function LecturerSessionPage() {
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(
                       joinUrl,
                     )}`}
-                    alt="Join quiz QR code"
+                    alt={t('lecturer.qrCodeAlt')}
                     className="h-full w-full object-contain"
                   />
                 </div>
                 <div className="text-xs text-rose-700 max-w-xs">
-                  Students can scan the QR code or visit the join link to enter the PIN and nickname.
+                  {t('lecturer.qrCodeInstructions')}
                 </div>
               </div>
             )}
@@ -426,11 +431,11 @@ export default function LecturerSessionPage() {
           {preCountdown !== null && !currentQuestion && (
             <div className="fixed inset-0 bg-gradient-to-br from-rose-500 via-orange-400 to-amber-300 z-50 flex flex-col items-center justify-center">
               <div className="text-center space-y-8">
-                <p className="text-2xl text-white/90 font-medium">Get Ready!</p>
+                <p className="text-2xl text-white/90 font-medium">{t('lecturer.getReady')}</p>
                 <div className="w-48 h-48 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
                   <span className="text-9xl font-bold text-white">{preCountdown}</span>
                 </div>
-                <p className="text-xl text-white/80">First question starting soon...</p>
+                <p className="text-xl text-white/80">{t('lecturer.firstQuestionStarting')}</p>
               </div>
             </div>
           )}
@@ -504,11 +509,23 @@ export default function LecturerSessionPage() {
                       className="bg-white text-rose-600 hover:bg-rose-50 text-lg px-8 py-4 h-auto"
                     >
                       {!results 
-                        ? 'Show Results'
+                        ? t('lecturer.showResults')
                         : questions.findIndex(q => q.id === currentQuestion.id) < questions.length - 1
-                        ? 'Next Question'
-                        : 'Finish Session'}
+                        ? t('lecturer.nextQuestion')
+                        : t('lecturer.finishSession')}
                     </Button>
+                  </div>
+                )}
+
+                {/* Scoreboard - Show when results are available */}
+                {results && rankings && rankings.length > 0 && (
+                  <div className="w-full">
+                    <div className="text-center mb-4">
+                      <div className="inline-block bg-white/20 backdrop-blur rounded-full px-6 py-2">
+                        <span className="text-2xl font-bold text-white">{t('lecturer.leaderboard')}</span>
+                      </div>
+                    </div>
+                    <Scoreboard rankings={rankings} />
                   </div>
                 )}
 
@@ -516,21 +533,21 @@ export default function LecturerSessionPage() {
                 {results && (
                   <Card className="bg-white/95 backdrop-blur shadow-2xl">
                     <CardHeader>
-                      <CardTitle className="text-xl text-center">Results</CardTitle>
+                      <CardTitle className="text-xl text-center">{t('lecturer.results')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-3 gap-4 text-center">
                         <div>
                           <p className="text-3xl font-bold text-rose-600">{results.totalResponses || 0}</p>
-                          <p className="text-sm text-muted-foreground mt-1">Total Responses</p>
+                          <p className="text-sm text-muted-foreground mt-1">{t('lecturer.totalResponses')}</p>
                         </div>
                         <div>
                           <p className="text-3xl font-bold text-green-600">{results.correctResponses || 0}</p>
-                          <p className="text-sm text-muted-foreground mt-1">Correct</p>
+                          <p className="text-sm text-muted-foreground mt-1">{t('lecturer.correct')}</p>
                         </div>
                         <div>
                           <p className="text-3xl font-bold text-blue-600">{Math.round(results.correctnessRate || 0)}%</p>
-                          <p className="text-sm text-muted-foreground mt-1">Accuracy</p>
+                          <p className="text-sm text-muted-foreground mt-1">{t('lecturer.accuracy')}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -543,14 +560,14 @@ export default function LecturerSessionPage() {
               {session.status === 'ACTIVE' && questions.length > 0 ? (
                 <>
                   <div className="px-6 py-3 rounded-full bg-emerald-600 text-emerald-50 text-sm font-medium shadow">
-                    Ready to start
+                    {t('lecturer.readyToStart')}
                   </div>
                   <div className="flex flex-col items-center gap-4">
                     <p className="text-lg text-gray-700">
-                      {questions.length} {questions.length === 1 ? 'question' : 'questions'} ready
+                      {questions.length} {questions.length === 1 ? t('lecturer.question') : t('lecturer.questions')} {t('lecturer.ready')}
                     </p>
                     {!connected && (
-                      <p className="text-sm text-amber-600">Connecting to session...</p>
+                      <p className="text-sm text-amber-600">{t('lecturer.connecting')}</p>
                     )}
                     <Button
                       onClick={() => handleStartQuestion(questions[0].id)}
@@ -559,21 +576,21 @@ export default function LecturerSessionPage() {
                       className="bg-gradient-to-r from-rose-600 to-orange-500 hover:from-rose-700 hover:to-orange-600 text-white px-8 py-6 text-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Play className="mr-2 h-5 w-5" />
-                      {questionsLoading ? 'Loading questions...' : 'Start First Question'}
+                      {questionsLoading ? t('lecturer.loadingQuestions') : t('lecturer.startFirstQuestion')}
                     </Button>
                   </div>
                 </>
               ) : (
                 <>
               <div className="px-6 py-3 rounded-full bg-rose-600 text-rose-50 text-sm font-medium shadow">
-                Waiting for participants
+                {t('lecturer.waitingParticipants')}
               </div>
               <div className="flex flex-col items-center gap-2">
                 <p className="text-6xl font-bold text-rose-700">
                   {participantCount}
                 </p>
                 <p className="text-sm text-rose-800">
-                  {participantCount === 1 ? 'participant joined' : 'participants joined'}
+                  {participantCount === 1 ? t('lecturer.participantJoined') : t('lecturer.participantsJoined')}
                 </p>
               </div>
                 </>
@@ -611,6 +628,7 @@ function QuickAddQuestionDialog({
   onQuestionAdded: () => void;
   trigger?: React.ReactNode;
 }) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -638,7 +656,7 @@ function QuickAddQuestionDialog({
       };
 
       await api.questions.create(sessionId, questionData);
-      toast.success('Question added!');
+      toast.success(t('lecturer.questionAdded'));
       onQuestionAdded();
       setOpen(false);
       // Reset form
@@ -650,7 +668,7 @@ function QuickAddQuestionDialog({
         timerSeconds: 30,
       });
     } catch (error) {
-      toast.error('Failed to add question');
+      toast.error(t('lecturer.failedAddQuestion'));
     } finally {
       setLoading(false);
     }
@@ -662,20 +680,20 @@ function QuickAddQuestionDialog({
         {trigger || (
           <Button size="sm">
             <Plus className="mr-2 h-4 w-4" />
-            Add Question
+            {t('lecturer.addQuestion')}
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Question</DialogTitle>
+          <DialogTitle>{t('lecturer.addQuestion')}</DialogTitle>
           <DialogDescription>
-            Create a new question for your session
+            {t('lecturer.createQuestionDescription')}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="type">Question Type</Label>
+            <Label htmlFor="type">{t('builder.questionType')}</Label>
             <Select
               value={formData.type}
               onValueChange={(value) => setFormData({ ...formData, type: value as QuestionType })}
@@ -684,17 +702,17 @@ function QuickAddQuestionDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={QuestionType.MULTIPLE_CHOICE}>Multiple Choice</SelectItem>
-                <SelectItem value={QuestionType.TRUE_FALSE}>True/False</SelectItem>
+                <SelectItem value={QuestionType.MULTIPLE_CHOICE}>{t('builder.multipleChoice')}</SelectItem>
+                <SelectItem value={QuestionType.TRUE_FALSE}>{t('builder.trueFalseLabel')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="question">Question</Label>
+            <Label htmlFor="question">{t('builder.question')}</Label>
             <Textarea
               id="question"
-              placeholder="Enter your question..."
+              placeholder={t('lecturer.enterQuestionPlaceholder')}
               value={formData.question}
               onChange={(e) => setFormData({ ...formData, question: e.target.value })}
               required
@@ -703,11 +721,11 @@ function QuickAddQuestionDialog({
 
           {formData.type === QuestionType.MULTIPLE_CHOICE && (
             <div className="space-y-2">
-              <Label>Options</Label>
+              <Label>{t('lecturer.options')}</Label>
               {formData.options.map((option, index) => (
                 <Input
                   key={index}
-                  placeholder={`Option ${index + 1}`}
+                  placeholder={`${t('lecturer.option')} ${index + 1}`}
                   value={option}
                   onChange={(e) => {
                     const newOptions = [...formData.options];
@@ -720,10 +738,10 @@ function QuickAddQuestionDialog({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="correctAnswer">Correct Answer</Label>
+            <Label htmlFor="correctAnswer">{t('lecturer.correctAnswer')}</Label>
             <Input
               id="correctAnswer"
-              placeholder="Enter correct answer..."
+              placeholder={t('lecturer.enterCorrectAnswer')}
               value={formData.correctAnswer}
               onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
               required
@@ -731,7 +749,7 @@ function QuickAddQuestionDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="timer">Timer (seconds)</Label>
+            <Label htmlFor="timer">{t('builder.timeLimit')}</Label>
             <Input
               id="timer"
               type="number"
@@ -744,11 +762,11 @@ function QuickAddQuestionDialog({
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={loading}>
               {loading ? <Spinner size="sm" className="mr-2" /> : null}
-              Add Question
+              {t('lecturer.addQuestion')}
             </Button>
           </div>
         </form>

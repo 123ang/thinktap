@@ -52,6 +52,12 @@ export class ResponsesController {
   ) {
     return this.responsesService.getTopRankings(sessionId, limit ? parseInt(limit) : 3);
   }
+
+  @Get('participants')
+  @UseGuards(JwtAuthGuard)
+  async getSessionParticipants(@Param('sessionId') sessionId: string) {
+    return this.responsesService.getSessionParticipants(sessionId);
+  }
 }
 
 @Controller('questions/:questionId/responses')
@@ -62,6 +68,12 @@ export class QuestionResponsesController {
   @UseGuards(JwtAuthGuard)
   async findAllByQuestion(@Param('questionId') questionId: string) {
     return this.responsesService.findAllByQuestion(questionId);
+  }
+
+  @Get('rankings')
+  @UseGuards(JwtAuthGuard)
+  async getQuestionRankings(@Param('questionId') questionId: string) {
+    return this.responsesService.getQuestionRankings(questionId);
   }
 }
 

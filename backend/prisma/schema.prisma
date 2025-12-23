@@ -11,18 +11,18 @@ datasource db {
 
 // User Model
 model User {
-  id                   String               @id @default(uuid())
-  email                String               @unique
-  password             String               // bcrypt hashed
-  plan                 Plan                 @default(FREE)
-  stripeCustomerId     String?              // For payment integration
-  subscriptionId       String?              // For subscription tracking
-  subscriptionStatus   SubscriptionStatus   @default(INACTIVE)
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-  quizzes              Quiz[]
-  sessions             Session[]
-  responses            Response[]
+  id                 String             @id @default(uuid())
+  email              String             @unique
+  password           String // bcrypt hashed
+  plan               Plan               @default(FREE)
+  stripeCustomerId   String? // For payment integration
+  subscriptionId     String? // For subscription tracking
+  subscriptionStatus SubscriptionStatus @default(INACTIVE)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  quizzes            Quiz[]
+  sessions           Session[]
+  responses          Response[]
 
   @@index([email])
   @@map("user")
@@ -30,14 +30,14 @@ model User {
 
 // Quiz Model - Reusable content that can be hosted in multiple sessions
 model Quiz {
-  id         String     @id @default(uuid())
-  title      String
-  userId     String
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  questions  Question[]
-  sessions   Session[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id        String     @id @default(uuid())
+  title     String
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions Question[]
+  sessions  Session[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   @@index([userId])
   @@map("quiz")
@@ -63,17 +63,20 @@ model Session {
   code       String        @unique // 6-digit numeric code
   lecturerId String
   lecturer   User          @relation(fields: [lecturerId], references: [id], onDelete: Cascade)
-  quizId     String?       // Link to the Quiz being played
+  quizId     String? // Link to the Quiz being played
   quiz       Quiz?         @relation(fields: [quizId], references: [id], onDelete: SetNull)
   mode       SessionMode
   status     SessionStatus @default(CREATED)
   createdAt  DateTime      @default(now())
   endedAt    DateTime?
+  isDeleted  Boolean       @default(false) // For soft delete (trash functionality)
+  deletedAt  DateTime? // When it was moved to trash
   responses  Response[]
 
   @@index([code])
   @@index([lecturerId])
   @@index([quizId])
+  @@index([lecturerId, isDeleted, endedAt])
   @@map("session")
 }
 
@@ -96,8 +99,8 @@ model Question {
   quiz          Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
   type          QuestionType
   question      String       @db.Text
-  options       Json?        // JSONB - For MC/MS: ["Option A", "Option B", ...]
-  correctAnswer Json         // JSONB - Varies by question type
+  options       Json? // JSONB - For MC/MS: ["Option A", "Option B", ...]
+  correctAnswer Json // JSONB - Varies by question type
   timerSeconds  Int?
   points        Int          @default(20) // Points awarded for correct answer (20 = standard, 40 = double)
   order         Int
@@ -119,19 +122,19 @@ enum QuestionType {
 
 // Response Model
 model Response {
-  id             String    @id @default(uuid())
+  id             String   @id @default(uuid())
   sessionId      String
-  session        Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session        Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   questionId     String
-  question       Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  userId         String?   // Nullable for anonymous (Seminar mode)
-  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  nickname       String?   // Student's nickname for anonymous play
-  response       Json      // JSONB - Student's answer
-  isCorrect      Boolean?  // Calculated based on question type
-  points         Int       @default(0) // Points awarded for this response
-  responseTimeMs Int       // Time taken to answer in milliseconds
-  submittedAt    DateTime  @default(now())
+  question       Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  userId         String? // Nullable for anonymous (Seminar mode)
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  nickname       String? // Student's nickname for anonymous play
+  response       Json // JSONB - Student's answer
+  isCorrect      Boolean? // Calculated based on question type
+  points         Int      @default(0) // Points awarded for this response
+  responseTimeMs Int // Time taken to answer in milliseconds
+  submittedAt    DateTime @default(now())
 
   @@index([sessionId])
   @@index([questionId])

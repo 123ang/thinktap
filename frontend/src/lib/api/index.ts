@@ -75,6 +75,18 @@ export const sessionsApi = {
 
   delete: (sessionId: string) =>
     apiClient.delete(`/sessions/${sessionId}`),
+
+  getReports: (includeDeleted: boolean = false) =>
+    apiClient.get<any[]>(`/sessions/reports?includeDeleted=${includeDeleted}`),
+
+  moveToTrash: (sessionId: string) =>
+    apiClient.post(`/sessions/${sessionId}/trash`, {}),
+
+  restoreFromTrash: (sessionId: string) =>
+    apiClient.post(`/sessions/${sessionId}/restore`, {}),
+
+  permanentlyDelete: (sessionId: string) =>
+    apiClient.delete(`/sessions/${sessionId}/permanent`),
 };
 
 // Questions API - Now uses quizId instead of sessionId
@@ -120,6 +132,12 @@ export const responsesApi = {
 
   getTopRankings: (sessionId: string, limit: number = 3) =>
     apiClient.get<any[]>(`/sessions/${sessionId}/responses/top-rankings?limit=${limit}`),
+
+  getQuestionRankings: (questionId: string) =>
+    apiClient.get<any[]>(`/questions/${questionId}/responses/rankings`),
+
+  getSessionParticipants: (sessionId: string) =>
+    apiClient.get<any[]>(`/sessions/${sessionId}/responses/participants`),
 };
 
 // Analytics API

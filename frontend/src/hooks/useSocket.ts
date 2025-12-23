@@ -14,6 +14,7 @@ let globalParticipantNames: string[] = [];
 let globalCurrentQuestion: Question | null = null;
 let globalTimeRemaining: number | null = null;
 let globalResults: QuestionInsight | null = null;
+let globalRankings: any[] | null = null;
 let globalPreCountdown: number | null = null;
 let preCountdownInterval: NodeJS.Timeout | null = null;
 
@@ -93,6 +94,7 @@ const initSocket = () => {
     globalCurrentQuestion = question;
     globalTimeRemaining = data.timerSeconds || null;
     globalResults = null;
+    globalRankings = null; // Reset rankings for new question
     globalPreCountdown = null; // Clear pre-countdown when question starts
     if (preCountdownInterval) {
       clearInterval(preCountdownInterval);
@@ -149,6 +151,10 @@ const initSocket = () => {
     } else {
       globalResults = data;
     }
+    // Store rankings if available
+    if (data.rankings) {
+      globalRankings = data.rankings;
+    }
     notifyListeners();
   });
 
@@ -157,6 +163,7 @@ const initSocket = () => {
     globalCurrentQuestion = null;
     globalTimeRemaining = null;
     globalResults = null;
+    globalRankings = null;
     if (data.leaderboard) {
       (socket as any).lastLeaderboard = data.leaderboard;
     }
@@ -189,6 +196,7 @@ export const useSocket = (options: UseSocketOptions = {}) => {
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(globalCurrentQuestion);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(globalTimeRemaining);
   const [results, setResults] = useState<QuestionInsight | null>(globalResults);
+  const [rankings, setRankings] = useState<any[] | null>(globalRankings);
   const [preCountdown, setPreCountdown] = useState<number | null>(globalPreCountdown);
 
   // Initialize socket and subscribe to state changes
@@ -206,6 +214,7 @@ export const useSocket = (options: UseSocketOptions = {}) => {
       setCurrentQuestion(globalCurrentQuestion);
       setTimeRemaining(globalTimeRemaining);
       setResults(globalResults);
+      setRankings(globalRankings);
       setPreCountdown(globalPreCountdown);
     };
 
@@ -254,6 +263,7 @@ export const useSocket = (options: UseSocketOptions = {}) => {
     globalCurrentQuestion = null;
     globalTimeRemaining = null;
     globalResults = null;
+    globalRankings = null;
     globalPreCountdown = null;
     if (preCountdownInterval) {
       clearInterval(preCountdownInterval);
@@ -276,6 +286,7 @@ export const useSocket = (options: UseSocketOptions = {}) => {
     currentQuestion,
     timeRemaining,
     results,
+    rankings,
     preCountdown,
     emitPreCountdown,
     startQuestion,

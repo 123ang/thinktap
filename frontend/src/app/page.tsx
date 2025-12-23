@@ -1,7 +1,11 @@
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   Zap, 
   Users, 
@@ -14,24 +18,35 @@ import {
 } from 'lucide-react';
 
 export default function LandingPage() {
+  const { t } = useLanguage();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
       {/* Navigation */}
       <nav className="border-b bg-white/80 backdrop-blur-sm fixed top-0 w-full z-50">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="text-2xl font-bold text-red-600 pb-1">ThinkTap</div>
-          <div className="hidden md:flex gap-6">
-            <Link href="#features" className="text-gray-600 hover:text-gray-900">Features</Link>
-            <Link href="#how-it-works" className="text-gray-600 hover:text-gray-900">How It Works</Link>
-            <Link href="#pricing" className="text-gray-600 hover:text-gray-900">Pricing</Link>
-            <Link href="#faq" className="text-gray-600 hover:text-gray-900">FAQ</Link>
+          <div className="hidden md:flex gap-6 items-center">
+            <Link href="#features" className="text-gray-600 hover:text-gray-900">
+              {t('nav.features')}
+            </Link>
+            <Link href="#how-it-works" className="text-gray-600 hover:text-gray-900">
+              {t('nav.howItWorks')}
+            </Link>
+            <Link href="#pricing" className="text-gray-600 hover:text-gray-900">
+              {t('nav.pricing')}
+            </Link>
+            <Link href="/faq" className="text-gray-600 hover:text-gray-900">
+              {t('nav.faq')}
+            </Link>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-center">
+            <LanguageSwitcher />
             <Button variant="ghost" asChild>
-              <Link href="/login">Login</Link>
+              <Link href="/login">{t('nav.login')}</Link>
             </Button>
             <Button asChild>
-              <Link href="/register">Get Started Free</Link>
+              <Link href="/register">{t('nav.register')}</Link>
             </Button>
           </div>
         </div>
@@ -41,27 +56,31 @@ export default function LandingPage() {
       <section className="pt-32 pb-20 px-4">
         <div className="container mx-auto text-center">
           <Badge className="mb-4" variant="secondary">
-            🎓 Built for Universities
+            🎓 {t('hero.badge')}
           </Badge>
           <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-red-600 to-orange-500 text-transparent bg-clip-text leading-tight pb-2">
-            Transform Your Classroom<br />with Real-Time Engagement
+            {t('hero.title').split('\n').map((line, idx) => (
+              <span key={idx}>
+                {line}
+                {idx === 0 && <br />}
+              </span>
+            ))}
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            ThinkTap makes interactive learning seamless with real-time quizzes, instant feedback, 
-            and powerful analytics for lecturers and students.
+            {t('hero.subtitle')}
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
             <Button size="lg" asChild>
               <Link href="/register">
-                Start Free <ArrowRight className="ml-2 h-4 w-4" />
+                {t('hero.ctaPrimary')} <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="#demo">Watch Demo</Link>
+              <Link href="#demo">{t('hero.ctaSecondary')}</Link>
             </Button>
           </div>
           <p className="text-sm text-gray-500 mt-4">
-            ✓ No credit card required • ✓ Set up in 2 minutes • ✓ Free forever
+            ✓ {t('hero.note')}
           </p>
         </div>
       </section>
@@ -70,9 +89,9 @@ export default function LandingPage() {
       <section id="features" className="py-20 px-4 bg-white">
         <div className="container mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Everything You Need for Engagement</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('landing.features.title')}</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Powerful features designed specifically for modern classroom environments
+              {t('landing.features.subtitle')}
             </p>
           </div>
 
@@ -82,9 +101,9 @@ export default function LandingPage() {
                 <div className="mb-4 text-red-600">
                   <Zap className="h-10 w-10" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Real-Time Interaction</h3>
+                <h3 className="text-xl font-semibold mb-2">{t('landing.features.realTime.title')}</h3>
                 <p className="text-gray-600">
-                  Run live quizzes with Rush, Thinking, and Seminar modes. Students answer in real-time from any device.
+                  {t('landing.features.realTime.desc')}
                 </p>
               </CardContent>
             </Card>
@@ -94,9 +113,9 @@ export default function LandingPage() {
                 <div className="mb-4 text-orange-600">
                   <CheckCircle className="h-10 w-10" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Versatile Question Formats</h3>
+                <h3 className="text-xl font-semibold mb-2">{t('landing.features.questionFormats.title')}</h3>
                 <p className="text-gray-600">
-                  Multiple choice, true/false, multiple select, short and long answer questions. All in one platform.
+                  {t('landing.features.questionFormats.desc')}
                 </p>
               </CardContent>
             </Card>
@@ -106,9 +125,9 @@ export default function LandingPage() {
                 <div className="mb-4 text-green-600">
                   <BarChart3 className="h-10 w-10" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Actionable Insights</h3>
+                <h3 className="text-xl font-semibold mb-2">{t('landing.features.insights.title')}</h3>
                 <p className="text-gray-600">
-                  View response rates, correctness percentages, and student engagement with beautiful charts and graphs.
+                  {t('landing.features.insights.desc')}
                 </p>
               </CardContent>
             </Card>
@@ -118,9 +137,9 @@ export default function LandingPage() {
                 <div className="mb-4 text-orange-600">
                   <Smartphone className="h-10 w-10" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Works Everywhere</h3>
+                <h3 className="text-xl font-semibold mb-2">{t('landing.features.everywhere.title')}</h3>
                 <p className="text-gray-600">
-                  Web and mobile apps for lecturers and students. Join sessions with a simple 6-digit code.
+                  {t('landing.features.everywhere.desc')}
                 </p>
               </CardContent>
             </Card>
@@ -130,9 +149,9 @@ export default function LandingPage() {
                 <div className="mb-4 text-pink-600">
                   <Shield className="h-10 w-10" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Privacy-First Learning</h3>
+                <h3 className="text-xl font-semibold mb-2">{t('landing.features.privacy.title')}</h3>
                 <p className="text-gray-600">
-                  Seminar mode enables anonymous responses for sensitive topics and open discussions.
+                  {t('landing.features.privacy.desc')}
                 </p>
               </CardContent>
             </Card>
@@ -142,9 +161,9 @@ export default function LandingPage() {
                 <div className="mb-4 text-cyan-600">
                   <Rocket className="h-10 w-10" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Easy to Use</h3>
+                <h3 className="text-xl font-semibold mb-2">{t('landing.features.easy.title')}</h3>
                 <p className="text-gray-600">
-                  Create and launch sessions in seconds. Students join instantly with no account required.
+                  {t('landing.features.easy.desc')}
                 </p>
               </CardContent>
             </Card>
@@ -156,9 +175,9 @@ export default function LandingPage() {
       <section id="how-it-works" className="py-20 px-4">
         <div className="container mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('landing.howItWorks.title')}</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Get started in three simple steps
+              {t('landing.howItWorks.subtitle')}
             </p>
           </div>
 
@@ -167,9 +186,9 @@ export default function LandingPage() {
               <div className="bg-red-100 text-red-600 w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
                 1
               </div>
-              <h3 className="text-xl font-semibold mb-2">Create Session</h3>
+              <h3 className="text-xl font-semibold mb-2">{t('landing.howItWorks.step1.title')}</h3>
               <p className="text-gray-600">
-                Choose your question mode and create questions in seconds
+                {t('landing.howItWorks.step1.desc')}
               </p>
             </div>
 
@@ -177,9 +196,9 @@ export default function LandingPage() {
               <div className="bg-orange-100 text-orange-600 w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
                 2
               </div>
-              <h3 className="text-xl font-semibold mb-2">Students Join</h3>
+              <h3 className="text-xl font-semibold mb-2">{t('landing.howItWorks.step2.title')}</h3>
               <p className="text-gray-600">
-                Share the 6-digit code. Students join from any device instantly
+                {t('landing.howItWorks.step2.desc')}
               </p>
             </div>
 
@@ -187,9 +206,9 @@ export default function LandingPage() {
               <div className="bg-green-100 text-green-600 w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
                 3
               </div>
-              <h3 className="text-xl font-semibold mb-2">Engage & Analyze</h3>
+              <h3 className="text-xl font-semibold mb-2">{t('landing.howItWorks.step3.title')}</h3>
               <p className="text-gray-600">
-                Run live questions, see real-time responses, and review insights
+                {t('landing.howItWorks.step3.desc')}
               </p>
             </div>
           </div>
@@ -200,9 +219,9 @@ export default function LandingPage() {
       <section id="pricing" className="py-20 px-4 bg-white">
         <div className="container mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Simple, Transparent Pricing</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('landing.pricing.title')}</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Choose the plan that fits your needs
+              {t('landing.pricing.subtitle')}
             </p>
           </div>
 
@@ -210,31 +229,31 @@ export default function LandingPage() {
             {/* Freemium Plan */}
             <Card className="border-2">
               <CardContent className="pt-6">
-                <h3 className="text-xl font-bold mb-2">Freemium</h3>
+                <h3 className="text-xl font-bold mb-2">{t('landing.pricing.freemium.title')}</h3>
                 <div className="mb-4">
-                  <span className="text-4xl font-bold">RM0</span>
-                  <span className="text-gray-600">/month</span>
+                  <span className="text-4xl font-bold">{t('landing.pricing.freemium.price')}</span>
+                  <span className="text-gray-600">{t('landing.pricing.freemium.period')}</span>
                 </div>
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>Unlimited live sessions</span>
+                    <span>{t('landing.pricing.freemium.unlimited')}</span>
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>All question types</span>
+                    <span>{t('landing.pricing.freemium.allTypes')}</span>
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>All 3 modes</span>
+                    <span>{t('landing.pricing.freemium.allModes')}</span>
                   </li>
                   <li className="flex items-start text-gray-400">
                     <span className="mr-2">✗</span>
-                    <span>No history save</span>
+                    <span>{t('landing.pricing.freemium.noHistory')}</span>
                   </li>
                 </ul>
                 <Button className="w-full" variant="outline" asChild>
-                  <Link href="/register">Start Free</Link>
+                  <Link href="/register">{t('landing.pricing.freemium.cta')}</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -242,34 +261,34 @@ export default function LandingPage() {
             {/* Pro Plan */}
             <Card className="border-2 border-red-600 relative">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <Badge className="bg-red-600">Most Popular</Badge>
+                <Badge className="bg-red-600">{t('landing.pricing.pro.badge')}</Badge>
               </div>
               <CardContent className="pt-6">
-                <h3 className="text-xl font-bold mb-2">ThinkTap Pro</h3>
+                <h3 className="text-xl font-bold mb-2">{t('landing.pricing.pro.title')}</h3>
                 <div className="mb-4">
-                  <span className="text-4xl font-bold">RM20</span>
-                  <span className="text-gray-600">/month</span>
+                  <span className="text-4xl font-bold">{t('landing.pricing.pro.price')}</span>
+                  <span className="text-gray-600">{t('landing.pricing.pro.period')}</span>
                 </div>
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>Everything in Free</span>
+                    <span>{t('landing.pricing.pro.everythingFree')}</span>
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>Full history</span>
+                    <span>{t('landing.pricing.pro.fullHistory')}</span>
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>Advanced analytics</span>
+                    <span>{t('landing.pricing.pro.advanced')}</span>
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>Export results</span>
+                    <span>{t('landing.pricing.pro.export')}</span>
                   </li>
                 </ul>
                 <Button className="w-full" asChild>
-                  <Link href="/register">Subscribe</Link>
+                  <Link href="/register">{t('landing.pricing.pro.cta')}</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -277,31 +296,31 @@ export default function LandingPage() {
             {/* Faculty Plan */}
             <Card className="border-2">
               <CardContent className="pt-6">
-                <h3 className="text-xl font-bold mb-2">Faculty Plan</h3>
+                <h3 className="text-xl font-bold mb-2">{t('landing.pricing.faculty.title')}</h3>
                 <div className="mb-4">
-                  <span className="text-4xl font-bold">RM1K</span>
-                  <span className="text-gray-600">/month</span>
+                  <span className="text-4xl font-bold">{t('landing.pricing.faculty.price')}</span>
+                  <span className="text-gray-600">{t('landing.pricing.faculty.period')}</span>
                 </div>
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>Everything in Pro</span>
+                    <span>{t('landing.pricing.faculty.everythingPro')}</span>
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>Multiple users</span>
+                    <span>{t('landing.pricing.faculty.multipleUsers')}</span>
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>Shared resources</span>
+                    <span>{t('landing.pricing.faculty.shared')}</span>
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>Custom branding</span>
+                    <span>{t('landing.pricing.faculty.branding')}</span>
                   </li>
                 </ul>
                 <Button className="w-full" variant="outline" asChild>
-                  <Link href="/contact">Contact Sales</Link>
+                  <Link href="/contact">{t('landing.pricing.faculty.cta')}</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -309,30 +328,30 @@ export default function LandingPage() {
             {/* University License */}
             <Card className="border-2">
               <CardContent className="pt-6">
-                <h3 className="text-xl font-bold mb-2">University</h3>
+                <h3 className="text-xl font-bold mb-2">{t('landing.pricing.university.title')}</h3>
                 <div className="mb-4">
-                  <span className="text-4xl font-bold">Custom</span>
+                  <span className="text-4xl font-bold">{t('landing.pricing.university.price')}</span>
                 </div>
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>Everything in Faculty</span>
+                    <span>{t('landing.pricing.university.everythingFaculty')}</span>
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>Unlimited users</span>
+                    <span>{t('landing.pricing.university.unlimitedUsers')}</span>
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>LMS integration</span>
+                    <span>{t('landing.pricing.university.lms')}</span>
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>On-premise option</span>
+                    <span>{t('landing.pricing.university.onPremise')}</span>
                   </li>
                 </ul>
                 <Button className="w-full" variant="outline" asChild>
-                  <Link href="/contact">Contact Sales</Link>
+                  <Link href="/contact">{t('landing.pricing.university.cta')}</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -344,18 +363,18 @@ export default function LandingPage() {
       <section className="py-20 px-4 bg-gradient-to-r from-red-600 to-orange-500 text-white">
         <div className="container mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Transform Your Classroom?
+            {t('landing.cta.title')}
           </h2>
           <p className="text-xl mb-8 opacity-90">
-            Join hundreds of lecturers already using ThinkTap
+            {t('landing.cta.subtitle')}
           </p>
           <Button size="lg" variant="secondary" asChild>
             <Link href="/register">
-              Get Started Free <ArrowRight className="ml-2 h-4 w-4" />
+              {t('landing.cta.button')} <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
           <p className="text-sm mt-4 opacity-75">
-            No credit card required • Set up in 2 minutes
+            {t('landing.cta.note')}
           </p>
         </div>
       </section>
@@ -367,32 +386,33 @@ export default function LandingPage() {
             <div>
               <h3 className="text-white font-bold text-lg mb-4">ThinkTap</h3>
               <p className="text-sm">
-                Interactive classroom engagement platform built for universities.
+                {t('landing.footer.description')}
               </p>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-4">Product</h4>
+              <h4 className="text-white font-semibold mb-4">{t('landing.footer.product')}</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="#features" className="hover:text-white">Features</Link></li>
-                <li><Link href="#pricing" className="hover:text-white">Pricing</Link></li>
-                <li><Link href="/docs" className="hover:text-white">Documentation</Link></li>
+                <li><Link href="#features" className="hover:text-white">{t('landing.footer.features')}</Link></li>
+                <li><Link href="#pricing" className="hover:text-white">{t('landing.footer.pricing')}</Link></li>
+                <li><Link href="/docs" className="hover:text-white">{t('landing.footer.docs')}</Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-4">Company</h4>
+              <h4 className="text-white font-semibold mb-4">{t('landing.footer.company')}</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/about" className="hover:text-white">About</Link></li>
-                <li><Link href="/contact" className="hover:text-white">Contact</Link></li>
-                <li><Link href="/privacy" className="hover:text-white">Privacy</Link></li>
+                <li><Link href="/about" className="hover:text-white">{t('landing.footer.about')}</Link></li>
+                <li><Link href="/contact" className="hover:text-white">{t('landing.footer.contact')}</Link></li>
+                <li><Link href="/privacy" className="hover:text-white">{t('landing.footer.privacy')}</Link></li>
+                <li><Link href="/terms" className="hover:text-white">{t('landing.footer.terms')}</Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-4">Connect</h4>
+              <h4 className="text-white font-semibold mb-4">{t('landing.footer.connect')}</h4>
               <p className="text-sm">support@thinktap.com</p>
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 text-center text-sm">
-            <p>© 2025 ThinkTap. All rights reserved.</p>
+            <p>{t('landing.footer.copyright')}</p>
           </div>
         </div>
       </footer>
