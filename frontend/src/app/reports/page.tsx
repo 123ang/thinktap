@@ -136,10 +136,29 @@ export default function ReportsPage() {
   };
 
   const handleSelectAll = () => {
-    if (selectedReports.size === filteredReports.length) {
+    setSelectedReports((prev) => {
+      if (prev.size === filteredReports.length) {
+        return new Set();
+      }
+      return new Set(filteredReports.map((r) => r.id));
+    });
+  };
+
+  const handleBulkMoveToTrash = async () => {
+    if (selectedReports.size === 0) return;
+
+    try {
+      await Promise.all(
+        Array.from(selectedReports).map((reportId) =>
+          api.sessions.moveToTrash(reportId),
+        ),
+      );
+      toast.success('Selected reports moved to trash');
       setSelectedReports(new Set());
-    } else {
-      setSelectedReports(new Set(filteredReports.map(r => r.id)));
+      loadReports();
+    } catch (error) {
+      console.error('Error moving selected to trash:', error);
+      toast.error('Failed to move selected reports to trash');
     }
   };
 
@@ -419,6 +438,19 @@ export default function ReportsPage() {
                         </Select>
                       </div>
                     </div>
+                    {/* Bulk actions */}
+                    {view === 'all' && selectedReports.size > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleBulkMoveToTrash}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Move selected to Trash
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
