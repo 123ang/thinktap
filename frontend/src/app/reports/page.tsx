@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/hooks';
+import { useLanguage } from '@/contexts/LanguageContext';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,6 +60,7 @@ type SortOption = 'date-desc' | 'date-asc' | 'title-asc' | 'title-desc';
 
 export default function ReportsPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,7 +92,7 @@ export default function ReportsPage() {
       setReports(data);
     } catch (error) {
       console.error('Error loading reports:', error);
-      toast.error('Failed to load reports');
+      toast.error(t('reports.loadError'));
     } finally {
       setLoading(false);
     }
@@ -99,39 +101,39 @@ export default function ReportsPage() {
   const handleMoveToTrash = async (reportId: string) => {
     try {
       await api.sessions.moveToTrash(reportId);
-      toast.success('Report moved to trash');
+      toast.success(t('reports.moveToTrashSuccess'));
       loadReports();
       setSelectedReports(new Set());
     } catch (error) {
       console.error('Error moving to trash:', error);
-      toast.error('Failed to move report to trash');
+      toast.error(t('reports.moveToTrashError'));
     }
   };
 
   const handleRestore = async (reportId: string) => {
     try {
       await api.sessions.restoreFromTrash(reportId);
-      toast.success('Report restored');
+      toast.success(t('reports.restoreSuccess'));
       loadReports();
       setSelectedReports(new Set());
     } catch (error) {
       console.error('Error restoring report:', error);
-      toast.error('Failed to restore report');
+      toast.error(t('reports.restoreError'));
     }
   };
 
   const handlePermanentlyDelete = async (reportId: string) => {
-    const confirmed = window.confirm('Are you sure you want to permanently delete this report? This action cannot be undone.');
+    const confirmed = window.confirm(t('reports.permanentDeleteConfirm'));
     if (!confirmed) return;
 
     try {
       await api.sessions.permanentlyDelete(reportId);
-      toast.success('Report permanently deleted');
+      toast.success(t('reports.permanentDeleteSuccess'));
       loadReports();
       setSelectedReports(new Set());
     } catch (error) {
       console.error('Error deleting report:', error);
-      toast.error('Failed to delete report');
+      toast.error(t('reports.permanentDeleteError'));
     }
   };
 
@@ -153,12 +155,12 @@ export default function ReportsPage() {
           api.sessions.moveToTrash(reportId),
         ),
       );
-      toast.success('Selected reports moved to trash');
+      toast.success(t('reports.bulkMoveSuccess'));
       setSelectedReports(new Set());
       loadReports();
     } catch (error) {
       console.error('Error moving selected to trash:', error);
-      toast.error('Failed to move selected reports to trash');
+      toast.error(t('reports.bulkMoveError'));
     }
   };
 
@@ -341,13 +343,13 @@ export default function ReportsPage() {
             <div className="flex items-center gap-4">
               <Link href="/dashboard">
                 <Button variant="ghost" size="sm">
-                  ← Back to Dashboard
+                  ← {t('common.back')}
                 </Button>
               </Link>
               <div>
-                <h1 className="text-2xl font-bold pb-1">Reports</h1>
+                <h1 className="text-2xl font-bold pb-1">{t('reports.title')}</h1>
                 <p className="text-sm text-muted-foreground">
-                  View and manage your completed quiz sessions
+                  {t('reports.subtitle')}
                 </p>
               </div>
             </div>
@@ -371,7 +373,7 @@ export default function ReportsPage() {
                   }`}
                 >
                   <FileText className="h-4 w-4" />
-                  All reports
+                  {t('reports.sidebarAll')}
                 </button>
                 <button
                   onClick={() => setView('trash')}
@@ -382,7 +384,7 @@ export default function ReportsPage() {
                   }`}
                 >
                   <Trash2 className="h-4 w-4" />
-                  Trash
+                  {t('reports.sidebarTrash')}
                 </button>
               </div>
             </aside>
@@ -394,13 +396,15 @@ export default function ReportsPage() {
                 <div className="p-6 border-b">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-2xl font-bold">
-                      {view === 'all' ? 'All reports' : 'Trash'}
+                      {view === 'all'
+                        ? t('reports.headerAll')
+                        : t('reports.headerTrash')}
                     </h2>
                     <div className="flex items-center gap-3">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
-                          placeholder="Search"
+                          placeholder={t('reports.searchPlaceholder')}
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           className="pl-9 w-64"
@@ -421,19 +425,31 @@ export default function ReportsPage() {
                             <Square className="h-4 w-4" />
                           )}
                         </button>
-                        <span className="text-sm text-gray-600">Select all</span>
+                        <span className="text-sm text-gray-600">
+                          {t('reports.selectAll')}
+                        </span>
                       </label>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">Sort by:</span>
+                        <span className="text-sm text-gray-600">
+                          {t('reports.sortBy')}
+                        </span>
                         <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
                           <SelectTrigger className="w-48">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="date-desc">Date (Latest first)</SelectItem>
-                            <SelectItem value="date-asc">Date (Oldest first)</SelectItem>
-                            <SelectItem value="title-asc">Title (A-Z)</SelectItem>
-                            <SelectItem value="title-desc">Title (Z-A)</SelectItem>
+                            <SelectItem value="date-desc">
+                              {t('reports.sort.dateDesc')}
+                            </SelectItem>
+                            <SelectItem value="date-asc">
+                              {t('reports.sort.dateAsc')}
+                            </SelectItem>
+                            <SelectItem value="title-asc">
+                              {t('reports.sort.titleAsc')}
+                            </SelectItem>
+                            <SelectItem value="title-desc">
+                              {t('reports.sort.titleDesc')}
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -447,7 +463,7 @@ export default function ReportsPage() {
                           onClick={handleBulkMoveToTrash}
                         >
                           <Trash2 className="h-4 w-4 mr-1" />
-                          Move selected to Trash
+                          {t('reports.bulkMoveLabel')}
                         </Button>
                       </div>
                     )}
@@ -463,7 +479,9 @@ export default function ReportsPage() {
                   ) : sortedReports.length === 0 ? (
                     <div className="text-center py-12">
                       <p className="text-gray-500">
-                        {view === 'all' ? 'No reports yet' : 'Trash is empty'}
+                        {view === 'all'
+                          ? t('reports.emptyAll')
+                          : t('reports.emptyTrash')}
                       </p>
                     </div>
                   ) : (
@@ -493,9 +511,13 @@ export default function ReportsPage() {
                             </h3>
                             <div className="flex items-center gap-3 text-sm text-gray-600">
                               <Badge className="bg-green-100 text-green-800 border-green-200">
-                                Finished
+                                {t('reports.badgeFinished')}
                               </Badge>
-                              <span>Ended {formatDate(report.endedAt)}</span>
+                              <span>
+                                {t('reports.endedLabel', {
+                                  date: formatDate(report.endedAt),
+                                })}
+                              </span>
                             </div>
                           </div>
 
@@ -521,17 +543,17 @@ export default function ReportsPage() {
                                       onClick={() => handleViewQuestions(report)}
                                     >
                                       <FileText className="h-4 w-4 mr-2" />
-                                      View Questions
+                                      {t('reports.menu.viewQuestions')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
                                       onClick={() => handleViewParticipants(report)}
                                     >
                                       <Users className="h-4 w-4 mr-2" />
-                                      View Participants
+                                      {t('reports.menu.viewParticipants')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem asChild>
                                       <Link href={`/session/${report.id}/insights`}>
-                                        View Insights
+                                        {t('reports.menu.viewInsights')}
                                       </Link>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
@@ -539,7 +561,7 @@ export default function ReportsPage() {
                                       className="text-red-600"
                                     >
                                       <Trash2 className="h-4 w-4 mr-2" />
-                                      Move to Trash
+                                      {t('reports.menu.moveToTrash')}
                                     </DropdownMenuItem>
                                   </>
                                 ) : (
@@ -548,14 +570,14 @@ export default function ReportsPage() {
                                       onClick={() => handleRestore(report.id)}
                                     >
                                       <RotateCcw className="h-4 w-4 mr-2" />
-                                      Restore
+                                      {t('reports.menu.restore')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
                                       onClick={() => handlePermanentlyDelete(report.id)}
                                       className="text-red-600"
                                     >
                                       <Trash2 className="h-4 w-4 mr-2" />
-                                      Permanently Delete
+                                      {t('reports.menu.permanentlyDelete')}
                                     </DropdownMenuItem>
                                   </>
                                 )}
@@ -580,7 +602,9 @@ export default function ReportsPage() {
               <div className="p-6 border-b">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-2xl font-bold">Participants</h2>
+                    <h2 className="text-2xl font-bold">
+                      {t('reports.participants.title')}
+                    </h2>
                     <p className="text-sm text-gray-600 mt-1">
                       {selectedReport.quiz?.title || 'Untitled Quiz'}{' '}
                       <span className="text-xs text-gray-500">
@@ -601,12 +625,18 @@ export default function ReportsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">All ({participants.length})</span>
+                    <span className="text-sm font-medium">
+                      {t('reports.participants.allCount', {
+                        count: participants.length,
+                      })}
+                    </span>
                   </div>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
-                      placeholder="Search"
+                      placeholder={t(
+                        'reports.participants.searchPlaceholder',
+                      )}
                       value={participantSearchQuery}
                       onChange={(e) => setParticipantSearchQuery(e.target.value)}
                       className="pl-9 w-64"
@@ -623,7 +653,9 @@ export default function ReportsPage() {
                   </div>
                 ) : filteredAndSortedParticipants.length === 0 ? (
                   <div className="text-center py-12">
-                    <p className="text-gray-500">No participants found</p>
+                    <p className="text-gray-500">
+                      {t('reports.participants.empty')}
+                    </p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -634,17 +666,17 @@ export default function ReportsPage() {
                             className="text-left p-3 font-semibold cursor-pointer hover:bg-gray-50"
                             onClick={() => handleSortParticipants('nickname')}
                           >
-                            <div className="flex items-center gap-2">
-                              Nickname
-                              <span className="text-gray-400">↕</span>
-                            </div>
+                              <div className="flex items-center gap-2">
+                                {t('reports.participants.col.nickname')}
+                                <span className="text-gray-400">↕</span>
+                              </div>
                           </th>
                           <th 
                             className="text-left p-3 font-semibold cursor-pointer hover:bg-gray-50"
                             onClick={() => handleSortParticipants('rank')}
                           >
                             <div className="flex items-center gap-2">
-                              Rank
+                              {t('reports.participants.col.rank')}
                               <span className="text-gray-400">↕</span>
                             </div>
                           </th>
@@ -653,17 +685,19 @@ export default function ReportsPage() {
                             onClick={() => handleSortParticipants('correct')}
                           >
                             <div className="flex items-center gap-2">
-                              Correct answers
+                              {t('reports.participants.col.correct')}
                               <span className="text-gray-400">↕</span>
                             </div>
                           </th>
-                          <th className="text-left p-3 font-semibold">Unanswered</th>
+                          <th className="text-left p-3 font-semibold">
+                            {t('reports.participants.col.unanswered')}
+                          </th>
                           <th 
                             className="text-left p-3 font-semibold cursor-pointer hover:bg-gray-50"
                             onClick={() => handleSortParticipants('score')}
                           >
                             <div className="flex items-center gap-2">
-                              Final score
+                              {t('reports.participants.col.score')}
                               <span className="text-gray-400">↕</span>
                             </div>
                           </th>
@@ -750,7 +784,9 @@ export default function ReportsPage() {
               <div className="p-6 border-b">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-2xl font-bold">Questions</h2>
+                    <h2 className="text-2xl font-bold">
+                      {t('reports.questions.title')}
+                    </h2>
                     <p className="text-sm text-gray-600 mt-1">
                       {selectedReport.quiz?.title || 'Untitled Quiz'}{' '}
                       <span className="text-xs text-gray-500">
@@ -780,7 +816,7 @@ export default function ReportsPage() {
                           : 'text-gray-600 hover:bg-gray-100'
                       }`}
                     >
-                      All ({questions.length})
+                      {t('reports.questions.all', { count: questions.length })}
                     </button>
                     <button
                       onClick={() => setQuestionView('difficult')}
@@ -790,13 +826,19 @@ export default function ReportsPage() {
                           : 'text-gray-600 hover:bg-gray-100'
                       }`}
                     >
-                      Difficult questions ({questions.filter(q => q.correctnessRate < 50).length})
+                      {t('reports.questions.difficult', {
+                        count: questions.filter(
+                          (q) => q.correctnessRate < 50,
+                        ).length,
+                      })}
                     </button>
                   </div>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
-                      placeholder="Search"
+                      placeholder={t(
+                        'reports.questions.searchPlaceholder',
+                      )}
                       value={questionSearchQuery}
                       onChange={(e) => setQuestionSearchQuery(e.target.value)}
                       className="pl-9 w-64"
@@ -813,7 +855,9 @@ export default function ReportsPage() {
                   </div>
                 ) : filteredAndSortedQuestions.length === 0 ? (
                   <div className="text-center py-12">
-                    <p className="text-gray-500">No questions found</p>
+                    <p className="text-gray-500">
+                      {t('reports.questions.empty')}
+                    </p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -825,7 +869,7 @@ export default function ReportsPage() {
                             onClick={() => handleSortQuestions('question')}
                           >
                             <div className="flex items-center gap-2">
-                              Question
+                              {t('reports.questions.col.question')}
                               <span className="text-gray-400">↕</span>
                             </div>
                           </th>
@@ -834,7 +878,7 @@ export default function ReportsPage() {
                             onClick={() => handleSortQuestions('type')}
                           >
                             <div className="flex items-center gap-2">
-                              Type
+                              {t('reports.questions.col.type')}
                               <span className="text-gray-400">↕</span>
                             </div>
                           </th>
@@ -843,7 +887,7 @@ export default function ReportsPage() {
                             onClick={() => handleSortQuestions('correct')}
                           >
                               <div className="flex items-center gap-2">
-                                Correct / Incorrect
+                                {t('reports.questions.col.correctIncorrect')}
                                 <span className="text-gray-400">↕</span>
                               </div>
                           </th>
