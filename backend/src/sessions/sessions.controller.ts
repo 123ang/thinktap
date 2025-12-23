@@ -33,6 +33,20 @@ export class SessionsController {
     return this.sessionsService.findAll(req.user.id);
   }
 
+  // IMPORTANT: Static routes like 'reports' and 'code/:code' must come BEFORE
+  // the dynamic ':id' route to avoid NestJS matching them as an id parameter.
+  @Get('reports')
+  @UseGuards(JwtAuthGuard)
+  async findAllReports(
+    @Request() req,
+    @Query('includeDeleted') includeDeleted?: string,
+  ) {
+    return this.sessionsService.findAllReports(
+      req.user.id,
+      includeDeleted === 'true',
+    );
+  }
+
   @Get('code/:code')
   async findByCode(@Param('code') code: string) {
     return this.sessionsService.findByCode(code);
@@ -57,6 +71,7 @@ export class SessionsController {
     });
   }
 
+  // Dynamic :id route - must come AFTER all static routes
   @Get(':id')
   @UseGuards(JwtOptionalAuthGuard)
   async findOne(@Param('id') id: string, @Request() req) {
@@ -89,18 +104,6 @@ export class SessionsController {
   @UseGuards(JwtAuthGuard)
   async delete(@Param('id') id: string, @Request() req) {
     return this.sessionsService.delete(id, req.user.id);
-  }
-
-  @Get('reports')
-  @UseGuards(JwtAuthGuard)
-  async findAllReports(
-    @Request() req,
-    @Query('includeDeleted') includeDeleted?: string,
-  ) {
-    return this.sessionsService.findAllReports(
-      req.user.id,
-      includeDeleted === 'true',
-    );
   }
 
   @Post(':id/trash')

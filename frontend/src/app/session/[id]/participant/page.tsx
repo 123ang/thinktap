@@ -86,12 +86,12 @@ export default function ParticipantSessionPage() {
         if (!alreadyJoined) {
           console.log('[Participant] Joining session via HTTP:', session.id, nickname);
           try {
-            const result = await api.sessions.join(session.id, {
-              nickname,
-              role: 'student',
-            });
+          const result = await api.sessions.join(session.id, {
+            nickname,
+            role: 'student',
+          });
             console.log('[Participant] Joined session via HTTP:', result);
-
+          
             if (typeof window !== 'undefined') {
               localStorage.setItem(`thinktap-joined-${session.id}`, '1');
             }
@@ -114,14 +114,14 @@ export default function ParticipantSessionPage() {
         }
 
         // After successful/assumed join, join Socket.IO room for broadcasts
-        socket.emit('join_room', {
-          sessionId: session.id,
-          nickname,
-          role: 'student',
-        });
+            socket.emit('join_room', {
+              sessionId: session.id,
+              nickname,
+              role: 'student',
+            });
       } catch (error) {
         console.error('[Participant] Unexpected error during join:', error);
-        hasJoinedRef.current = false;
+          hasJoinedRef.current = false;
       }
     };
 
@@ -287,11 +287,11 @@ export default function ParticipantSessionPage() {
       await api.responses.submit(sessionId, {
         questionId: currentQuestion.id,
         response: finalResponse, // Sending index(es) instead of text
-        responseTimeMs,
+      responseTimeMs,
         nickname: nickname || undefined,
-      });
+    });
 
-      setResponseSubmitted(true);
+    setResponseSubmitted(true);
       toast.success(t('participant.responseSubmitted'));
     } catch (error: any) {
       console.error('[Participant] Failed to submit response:', error);
@@ -720,23 +720,23 @@ export default function ParticipantSessionPage() {
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 p-4">
       <div className="container mx-auto max-w-3xl py-8">
         {/* Session Header */}
-          <Card className="mb-6">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
                   <CardTitle>
                     {session?.code
                       ? t('participant.sessionCode', { code: session.code }) || `Session ${session.code}`
                       : 'Session'}
                   </CardTitle>
-                  <CardDescription>
+                <CardDescription>
                     {connected ? t('lecturer.connected') : t('lecturer.disconnected')}
-                  </CardDescription>
-                </div>
-                <LanguageSwitcher />
+                </CardDescription>
               </div>
-            </CardHeader>
-          </Card>
+                <LanguageSwitcher />
+            </div>
+          </CardHeader>
+        </Card>
 
         {/* Results or Waiting */}
         {results ? (
