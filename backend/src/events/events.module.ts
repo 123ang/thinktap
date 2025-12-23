@@ -6,9 +6,13 @@ import { ResponsesModule } from '../responses/responses.module';
 import { SessionStateModule } from '../session-state/session-state.module';
 
 @Module({
-  imports: [SessionsModule, QuestionsModule, ResponsesModule, SessionStateModule],
+  imports: [
+    SessionsModule,
+    QuestionsModule,
+    ResponsesModule,
+    SessionStateModule,
+  ],
   providers: [EventsGateway],
   exports: [EventsGateway],
 })
 export class EventsModule {}
-

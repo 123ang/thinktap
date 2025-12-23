@@ -54,4 +54,3 @@ export class QuestionsController {
     return this.questionsService.delete(questionId, req.user.id);
   }
 }
-

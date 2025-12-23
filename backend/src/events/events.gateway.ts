@@ -58,13 +58,22 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('join_room')
   async handleJoinRoom(
-    @MessageBody() payload: { sessionId: string; userId?: string; nickname?: string; role?: 'lecturer' | 'student' },
+    @MessageBody()
+    payload: {
+      sessionId: string;
+      userId?: string;
+      nickname?: string;
+      role?: 'lecturer' | 'student';
+    },
     @ConnectedSocket() client: Socket,
   ) {
     try {
       // Verify session exists
-      const session = await this.sessionsService.findOne(payload.sessionId, undefined);
-      
+      const session = await this.sessionsService.findOne(
+        payload.sessionId,
+        undefined,
+      );
+
       // Join socket room for broadcasts
       await client.join(payload.sessionId);
       this.socketToSession.set(client.id, payload.sessionId);
@@ -73,44 +82,71 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (payload.role === 'student') {
         // Clean up any old entries for this nickname (from page refreshes)
         if (payload.nickname) {
-          const existingParticipants = await this.sessionStateService.getParticipants(payload.sessionId);
+          const existingParticipants =
+            await this.sessionStateService.getParticipants(payload.sessionId);
           for (const socketId of existingParticipants) {
-            const info = await this.sessionStateService.getParticipant(payload.sessionId, socketId);
+            const info = await this.sessionStateService.getParticipant(
+              payload.sessionId,
+              socketId,
+            );
             // Remove if same nickname (user refreshed) or if socket is dead
             const socket = this.server.sockets.sockets.get(socketId);
-            if ((info?.nickname === payload.nickname && info?.role === 'student') || !socket) {
-              await this.sessionStateService.removeParticipant(payload.sessionId, socketId);
+            if (
+              (info?.nickname === payload.nickname &&
+                info?.role === 'student') ||
+              !socket
+            ) {
+              await this.sessionStateService.removeParticipant(
+                payload.sessionId,
+                socketId,
+              );
             }
           }
         }
-        
-        await this.sessionStateService.addParticipant(payload.sessionId, client.id, {
-          socketId: client.id,
-          userId: payload.userId,
-          nickname: payload.nickname,
-          role: 'student',
-          joinedAt: Date.now(),
-        });
+
+        await this.sessionStateService.addParticipant(
+          payload.sessionId,
+          client.id,
+          {
+            socketId: client.id,
+            userId: payload.userId,
+            nickname: payload.nickname,
+            role: 'student',
+            joinedAt: Date.now(),
+          },
+        );
       } else if (payload.role === 'lecturer') {
         // Clean up any existing lecturer entries in Redis (from before the fix)
         // Also remove this lecturer's socket if it was added previously
-        const participants = await this.sessionStateService.getParticipants(payload.sessionId);
+        const participants = await this.sessionStateService.getParticipants(
+          payload.sessionId,
+        );
         for (const socketId of participants) {
-          const info = await this.sessionStateService.getParticipant(payload.sessionId, socketId);
+          const info = await this.sessionStateService.getParticipant(
+            payload.sessionId,
+            socketId,
+          );
           // Remove if it's a lecturer OR if it matches this client's ID (to prevent duplicate)
           if (info?.role === 'lecturer' || socketId === client.id) {
-            await this.sessionStateService.removeParticipant(payload.sessionId, socketId);
+            await this.sessionStateService.removeParticipant(
+              payload.sessionId,
+              socketId,
+            );
           }
         }
         // Ensure this lecturer is NOT added to Redis
-        console.log(`[Socket.IO] Lecturer ${client.id} joined room but NOT added to participant count`);
+        console.log(
+          `[Socket.IO] Lecturer ${client.id} joined room but NOT added to participant count`,
+        );
       }
-      
+
       // Always broadcast updated participant count (after cleanup if lecturer)
       await this.broadcastParticipantCount(payload.sessionId);
-      
-      console.log(`[Socket.IO] Client ${client.id} joined room ${payload.sessionId} as ${payload.role || 'unknown'}`);
-      
+
+      console.log(
+        `[Socket.IO] Client ${client.id} joined room ${payload.sessionId} as ${payload.role || 'unknown'}`,
+      );
+
       return { success: true };
     } catch (error) {
       client.emit('error', { message: error.message });
@@ -120,16 +156,19 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: Socket) {
     console.log(`[Socket.IO] Client disconnected: ${client.id}`);
-    
+
     // Remove client from session state in Redis
     const sessionId = this.socketToSession.get(client.id);
     if (sessionId) {
-      this.sessionStateService.removeParticipant(sessionId, client.id).then(() => {
-        // Broadcast updated participant count
-        this.broadcastParticipantCount(sessionId);
-      }).catch(err => {
-        console.error('[Socket.IO] Error removing participant:', err);
-      });
+      this.sessionStateService
+        .removeParticipant(sessionId, client.id)
+        .then(() => {
+          // Broadcast updated participant count
+          this.broadcastParticipantCount(sessionId);
+        })
+        .catch((err) => {
+          console.error('[Socket.IO] Error removing participant:', err);
+        });
       this.socketToSession.delete(client.id);
     }
   }
@@ -137,14 +176,21 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Helper method to broadcast participant count
   private async broadcastParticipantCount(sessionId: string) {
     // Clean up any stale or invalid participants
-    const participants = await this.sessionStateService.getParticipants(sessionId);
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const participants =
+      await this.sessionStateService.getParticipants(sessionId);
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    console.log(`[Socket.IO] Cleaning up participants for session ${sessionId}, found ${participants.length} in Redis`);
+    console.log(
+      `[Socket.IO] Cleaning up participants for session ${sessionId}, found ${participants.length} in Redis`,
+    );
 
     for (const socketId of participants) {
       const socket = this.server.sockets.sockets.get(socketId);
-      const info = await this.sessionStateService.getParticipant(sessionId, socketId);
+      const info = await this.sessionStateService.getParticipant(
+        sessionId,
+        socketId,
+      );
 
       // Remove if:
       // - socket no longer exists (browser closed or backend restarted)
@@ -156,19 +202,29 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         (info?.userId && uuidRegex.test(info.userId)) ||
         (info?.nickname && uuidRegex.test(info.nickname))
       ) {
-        console.log(`[Socket.IO] Removing participant: socketId=${socketId}, role=${info?.role}, nickname=${info?.nickname}, socketExists=${!!socket}`);
+        console.log(
+          `[Socket.IO] Removing participant: socketId=${socketId}, role=${info?.role}, nickname=${info?.nickname}, socketExists=${!!socket}`,
+        );
         await this.sessionStateService.removeParticipant(sessionId, socketId);
       }
     }
 
     // Re-fetch remaining participants after cleanup
-    const remainingParticipants = await this.sessionStateService.getParticipants(sessionId);
+    const remainingParticipants =
+      await this.sessionStateService.getParticipants(sessionId);
 
     // Build student-only names (deduplicate by nickname)
     const studentNamesMap = new Map<string, string>(); // nickname -> socketId (keep only one per nickname)
     for (const socketId of remainingParticipants) {
-      const info = await this.sessionStateService.getParticipant(sessionId, socketId);
-      if (info?.role === 'student' && info.nickname && !uuidRegex.test(info.nickname)) {
+      const info = await this.sessionStateService.getParticipant(
+        sessionId,
+        socketId,
+      );
+      if (
+        info?.role === 'student' &&
+        info.nickname &&
+        !uuidRegex.test(info.nickname)
+      ) {
         // If we already have this nickname, remove the old socket (keep the newest one)
         if (studentNamesMap.has(info.nickname)) {
           const oldSocketId = studentNamesMap.get(info.nickname);
@@ -177,11 +233,17 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           // Keep the one with an active socket, or the newer one if both are active
           if (!oldSocket || (newSocket && socketId > oldSocketId!)) {
             // Remove old entry
-            await this.sessionStateService.removeParticipant(sessionId, oldSocketId!);
+            await this.sessionStateService.removeParticipant(
+              sessionId,
+              oldSocketId!,
+            );
             studentNamesMap.set(info.nickname, socketId);
           } else {
             // Remove this duplicate
-            await this.sessionStateService.removeParticipant(sessionId, socketId);
+            await this.sessionStateService.removeParticipant(
+              sessionId,
+              socketId,
+            );
           }
         } else {
           studentNamesMap.set(info.nickname, socketId);
@@ -213,11 +275,15 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // Method to join a session room (called after HTTP join)
-  async joinSessionRoom(sessionId: string, socketId: string, participantInfo: {
-    userId?: string;
-    nickname?: string;
-    role: 'lecturer' | 'student';
-  }) {
+  async joinSessionRoom(
+    sessionId: string,
+    socketId: string,
+    participantInfo: {
+      userId?: string;
+      nickname?: string;
+      role: 'lecturer' | 'student';
+    },
+  ) {
     const socket = this.server.sockets.sockets.get(socketId);
     if (!socket) {
       throw new Error('Socket not found');
@@ -238,9 +304,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
     } else if (participantInfo.role === 'lecturer') {
       // Clean up any existing lecturer entries in Redis
-      const participants = await this.sessionStateService.getParticipants(sessionId);
+      const participants =
+        await this.sessionStateService.getParticipants(sessionId);
       for (const pid of participants) {
-        const info = await this.sessionStateService.getParticipant(sessionId, pid);
+        const info = await this.sessionStateService.getParticipant(
+          sessionId,
+          pid,
+        );
         if (info?.role === 'lecturer') {
           await this.sessionStateService.removeParticipant(sessionId, pid);
         }
@@ -255,7 +325,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       session: { id: sessionId },
     });
 
-    console.log(`[Socket.IO] Client ${socketId} joined session room ${sessionId} as ${participantInfo.role}`);
+    console.log(
+      `[Socket.IO] Client ${socketId} joined session room ${sessionId} as ${participantInfo.role}`,
+    );
   }
 
   @SubscribeMessage('pre_countdown')
@@ -264,8 +336,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     try {
-      console.log(`[Socket.IO] Pre-countdown started for session ${payload.sessionId}, duration: ${payload.duration}s`);
-      
+      console.log(
+        `[Socket.IO] Pre-countdown started for session ${payload.sessionId}, duration: ${payload.duration}s`,
+      );
+
       // Broadcast to all in session room (including sender)
       this.server.to(payload.sessionId).emit('pre_countdown', {
         duration: payload.duration,
@@ -287,14 +361,16 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const question = await this.questionsService.findOne(payload.questionId);
 
-      console.log(`[Backend] Starting question ${payload.questionId} for session ${payload.sessionId}`);
+      console.log(
+        `[Backend] Starting question ${payload.questionId} for session ${payload.sessionId}`,
+      );
       console.log(`[Backend] Question from DB:`, {
         id: question.id,
         correctAnswer: question.correctAnswer,
         correctAnswerType: typeof question.correctAnswer,
         correctAnswerValue: JSON.stringify(question.correctAnswer),
       });
-      
+
       // Update session state in Redis
       if (question.timerSeconds) {
         await this.sessionStateService.startQuestion(
@@ -306,18 +382,23 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Serialize correctAnswer for Socket.IO
       let correctAnswerValue: any = null;
-      if (question.correctAnswer !== null && question.correctAnswer !== undefined) {
+      if (
+        question.correctAnswer !== null &&
+        question.correctAnswer !== undefined
+      ) {
         if (typeof question.correctAnswer === 'number') {
           correctAnswerValue = Number(question.correctAnswer);
         } else if (Array.isArray(question.correctAnswer)) {
           correctAnswerValue = [...question.correctAnswer];
         } else if (typeof question.correctAnswer === 'object') {
-          correctAnswerValue = JSON.parse(JSON.stringify(question.correctAnswer));
+          correctAnswerValue = JSON.parse(
+            JSON.stringify(question.correctAnswer),
+          );
         } else {
           correctAnswerValue = question.correctAnswer;
         }
       }
-      
+
       const questionData = {
         questionId: question.id,
         question: question.question,
@@ -327,17 +408,25 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         timerSeconds: question.timerSeconds,
         order: question.order,
       };
-      
-      console.log(`[Backend] Broadcasting question_started to room ${payload.sessionId}:`, {
-        questionId: questionData.questionId,
-        correctAnswer: questionData.correctAnswer,
-        correctAnswerType: typeof questionData.correctAnswer,
-      });
-      
-      if (questionData.correctAnswer === null || questionData.correctAnswer === undefined) {
-        console.warn(`[Backend] WARNING: Question ${question.id} has no correctAnswer!`);
+
+      console.log(
+        `[Backend] Broadcasting question_started to room ${payload.sessionId}:`,
+        {
+          questionId: questionData.questionId,
+          correctAnswer: questionData.correctAnswer,
+          correctAnswerType: typeof questionData.correctAnswer,
+        },
+      );
+
+      if (
+        questionData.correctAnswer === null ||
+        questionData.correctAnswer === undefined
+      ) {
+        console.warn(
+          `[Backend] WARNING: Question ${question.id} has no correctAnswer!`,
+        );
       }
-      
+
       // Broadcast to all in session room
       this.server.to(payload.sessionId).emit('question_started', questionData);
 
@@ -359,15 +448,20 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     try {
-      const insights = await this.responsesService.getInsights(payload.sessionId);
+      const insights = await this.responsesService.getInsights(
+        payload.sessionId,
+      );
 
       // Find the specific question insights
       const questionInsights = insights.questions.find(
         (q) => q.questionId === payload.questionId,
       );
 
-      // Get rankings for this question
-      const rankings = await this.responsesService.getQuestionRankings(payload.questionId);
+      // Get rankings for this question in this session only
+      const rankings = await this.responsesService.getQuestionRankings(
+        payload.sessionId,
+        payload.questionId,
+      );
 
       // Update session state
       await this.sessionStateService.showResults(payload.sessionId);
@@ -394,11 +488,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     try {
       // Get insights with leaderboard
-      const insights = await this.responsesService.getInsights(payload.sessionId);
-      
+      const insights = await this.responsesService.getInsights(
+        payload.sessionId,
+      );
+
       // Update session state
       await this.sessionStateService.endSession(payload.sessionId);
-      
+
       // Broadcast session ended to all participants with leaderboard data
       this.server.to(payload.sessionId).emit('session_ended', {
         message: 'Session has ended',
@@ -417,10 +513,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const interval = setInterval(async () => {
       remaining--;
-      
+
       // Update Redis state
       await this.sessionStateService.updateTimer(sessionId, remaining);
-      
+
       // Broadcast timer update
       this.server.to(sessionId).emit('timer_update', {
         remaining,
@@ -434,7 +530,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // Method to broadcast response submitted (called from responses service)
-  async broadcastResponseSubmitted(sessionId: string, questionId: string, responseCount: number) {
+  async broadcastResponseSubmitted(
+    sessionId: string,
+    questionId: string,
+    responseCount: number,
+  ) {
     this.server.to(sessionId).emit('response_submitted', {
       questionId,
       responseCount,

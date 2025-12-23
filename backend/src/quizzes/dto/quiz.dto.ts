@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsOptional, MaxLength, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  MaxLength,
+  IsBoolean,
+} from 'class-validator';
 
 // Simple settings shape for a quiz.
 // This is intentionally flat so it can evolve without breaking validation.

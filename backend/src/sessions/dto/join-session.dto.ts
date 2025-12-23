@@ -12,4 +12,3 @@ export class JoinSessionDto {
   @IsEnum(JoinRole)
   role: JoinRole;
 }
-

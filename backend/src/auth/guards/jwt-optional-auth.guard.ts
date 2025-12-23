@@ -15,9 +15,10 @@ export class JwtOptionalAuthGuard extends AuthGuard('jwt') {
   }
 
   // Override canActivate to always return true (allow the request)
-  canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
+  canActivate(
+    context: ExecutionContext,
+  ): boolean | Promise<boolean> | Observable<boolean> {
     // Always allow the request, but try to authenticate if a token is provided
     return super.canActivate(context) as Promise<boolean>;
   }
 }
-

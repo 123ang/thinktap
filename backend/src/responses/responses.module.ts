@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
-import { ResponsesController, QuestionResponsesController } from './responses.controller';
+import {
+  ResponsesController,
+  QuestionResponsesController,
+} from './responses.controller';
 import { ResponsesService } from './responses.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
@@ -10,4 +13,3 @@ import { PrismaModule } from '../prisma/prisma.module';
   exports: [ResponsesService],
 })
 export class ResponsesModule {}
-

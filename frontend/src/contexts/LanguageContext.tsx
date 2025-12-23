@@ -373,6 +373,15 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'builder.true': 'True',
     'builder.false': 'False',
     'builder.noCorrectAnswerWarning': 'This question has no correct answer set. Please select the correct answer and save.',
+    'builder.quizSettings': 'Quiz settings',
+    'builder.enableMusic': 'Enable background music (lecturer only)',
+    'builder.musicTrack': 'Music file name',
+    'builder.musicTrackJumanji': 'Jumanji drum (Default)',
+    'builder.musicTrackLofi': 'Lo-fi chill',
+    'builder.musicTrackEnergetic': 'Energetic beats',
+    'builder.musicTrackCalm': 'Calm piano',
+    'builder.enableCountdown': 'Enable 5 second countdown before first question',
+    'builder.enablePodium': 'Show podium at end of session',
 
     // Lecturer Session
     'lecturer.startSession': 'Start Session',
@@ -821,6 +830,15 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'builder.pts': '分',
     'builder.addAnswerPlaceholder': '添加答案',
     'builder.optional': '（可选）',
+    'builder.quizSettings': '测验设置',
+    'builder.enableMusic': '启用背景音乐（仅讲师端）',
+    'builder.musicTrack': '音乐文件名',
+    'builder.musicTrackJumanji': 'Jumanji 鼓点（默认）',
+    'builder.musicTrackLofi': 'Lo-fi 轻松音乐',
+    'builder.musicTrackEnergetic': '动感节奏',
+    'builder.musicTrackCalm': '舒缓钢琴',
+    'builder.enableCountdown': '在第一题前启用 5 秒倒计时',
+    'builder.enablePodium': '在课程结束时显示颁奖台',
 
     // Lecturer Session
     'lecturer.startSession': '开始课程',
@@ -1156,6 +1174,15 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'builder.pts': 'mata',
     'builder.addAnswerPlaceholder': 'Tambah jawapan',
     'builder.optional': '(pilihan)',
+    'builder.quizSettings': 'Tetapan kuiz',
+    'builder.enableMusic': 'Aktifkan muzik latar (hanya pensyarah)',
+    'builder.musicTrack': 'Nama fail muzik',
+    'builder.musicTrackJumanji': 'Dram Jumanji (Lalai)',
+    'builder.musicTrackLofi': 'Lo-fi santai',
+    'builder.musicTrackEnergetic': 'Rentak bertenaga',
+    'builder.musicTrackCalm': 'Piano menenangkan',
+    'builder.enableCountdown': 'Aktifkan kiraan detik 5 saat sebelum soalan pertama',
+    'builder.enablePodium': 'Tunjukkan podium pada akhir sesi',
 
     // Lecturer Session
     'lecturer.startSession': 'Mula Sesi',

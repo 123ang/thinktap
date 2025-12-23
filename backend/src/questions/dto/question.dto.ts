@@ -1,4 +1,12 @@
-import { IsEnum, IsString, IsNumber, IsOptional, IsArray, IsNotEmpty, ValidateIf } from 'class-validator';
+import {
+  IsEnum,
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsArray,
+  IsNotEmpty,
+  ValidateIf,
+} from 'class-validator';
 import { QuestionType } from '@prisma/client';
 
 export class CreateQuestionDto {
@@ -34,4 +42,3 @@ export class BulkCreateQuestionsDto {
   @IsArray()
   questions: CreateQuestionDto[];
 }
-

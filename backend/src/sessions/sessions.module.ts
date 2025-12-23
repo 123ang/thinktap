@@ -11,4 +11,3 @@ import { SessionStateModule } from '../session-state/session-state.module';
   exports: [SessionsService],
 })
 export class SessionsModule {}
-

@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Request,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { SessionsService } from './sessions.service';
 import { CreateSessionDto } from './dto/session.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -81,8 +93,14 @@ export class SessionsController {
 
   @Get('reports')
   @UseGuards(JwtAuthGuard)
-  async findAllReports(@Request() req, @Query('includeDeleted') includeDeleted?: string) {
-    return this.sessionsService.findAllReports(req.user.id, includeDeleted === 'true');
+  async findAllReports(
+    @Request() req,
+    @Query('includeDeleted') includeDeleted?: string,
+  ) {
+    return this.sessionsService.findAllReports(
+      req.user.id,
+      includeDeleted === 'true',
+    );
   }
 
   @Post(':id/trash')
@@ -103,4 +121,3 @@ export class SessionsController {
     return this.sessionsService.permanentlyDelete(id, req.user.id);
   }
 }
-

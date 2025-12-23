@@ -96,7 +96,9 @@ describe('AuthService', () => {
         confirmPassword: 'password123',
       };
 
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'existing-id' });
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'existing-id',
+      });
 
       await expect(service.register(registerDto)).rejects.toThrow();
     });
@@ -142,4 +144,3 @@ describe('AuthService', () => {
     });
   });
 });
-

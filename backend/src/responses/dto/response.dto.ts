@@ -19,4 +19,3 @@ export class SubmitResponseDto {
   @IsOptional()
   nickname?: string; // Student's nickname for anonymous play
 }
-

@@ -14,4 +14,3 @@ export class JoinSessionDto {
   @IsString()
   code: string;
 }
-

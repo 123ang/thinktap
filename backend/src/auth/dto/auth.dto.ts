@@ -1,4 +1,10 @@
-import { IsEmail, IsString, MinLength, IsEnum, IsOptional } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsEnum,
+  IsOptional,
+} from 'class-validator';
 import { Plan } from '@prisma/client';
 
 export class RegisterDto {
@@ -26,4 +32,3 @@ export class RefreshTokenDto {
   @IsString()
   refreshToken: string;
 }
-

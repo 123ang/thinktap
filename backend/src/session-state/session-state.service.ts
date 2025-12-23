@@ -37,7 +37,10 @@ export class SessionStateService {
   }
 
   // Session State Management
-  async createSessionState(sessionId: string, initialState: Partial<SessionState>): Promise<void> {
+  async createSessionState(
+    sessionId: string,
+    initialState: Partial<SessionState>,
+  ): Promise<void> {
     const state: SessionState = {
       sessionId,
       currentQuestionId: null,
@@ -62,7 +65,10 @@ export class SessionStateService {
     return JSON.parse(data);
   }
 
-  async updateSessionState(sessionId: string, updates: Partial<SessionState>): Promise<void> {
+  async updateSessionState(
+    sessionId: string,
+    updates: Partial<SessionState>,
+  ): Promise<void> {
     const current = await this.getSessionState(sessionId);
     if (!current) {
       await this.createSessionState(sessionId, updates);
@@ -110,7 +116,8 @@ export class SessionStateService {
     if (state) {
       // Get all participant names (only students, exclude UUIDs, deduplicate by nickname)
       const namesSet = new Set<string>(); // Use Set to automatically deduplicate
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       for (const pid of participants) {
         const info = await this.getParticipant(sessionId, pid);
         // Only include students in names, and exclude UUIDs
@@ -163,8 +170,13 @@ export class SessionStateService {
     }
   }
 
-  async getParticipant(sessionId: string, socketId: string): Promise<ParticipantInfo | null> {
-    const data = await this.redis.get(this.getParticipantKey(sessionId, socketId));
+  async getParticipant(
+    sessionId: string,
+    socketId: string,
+  ): Promise<ParticipantInfo | null> {
+    const data = await this.redis.get(
+      this.getParticipantKey(sessionId, socketId),
+    );
     if (!data) return null;
     return JSON.parse(data);
   }
@@ -191,7 +203,11 @@ export class SessionStateService {
   }
 
   // Question/Timer Management
-  async startQuestion(sessionId: string, questionId: string, timerSeconds: number): Promise<void> {
+  async startQuestion(
+    sessionId: string,
+    questionId: string,
+    timerSeconds: number,
+  ): Promise<void> {
     await this.updateSessionState(sessionId, {
       currentQuestionId: questionId,
       timeRemaining: timerSeconds,
@@ -220,4 +236,3 @@ export class SessionStateService {
     });
   }
 }
-

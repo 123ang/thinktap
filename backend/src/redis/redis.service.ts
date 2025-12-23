@@ -11,8 +11,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private configService: ConfigService) {}
 
   onModuleInit() {
-    const redisUrl = this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
-    
+    const redisUrl =
+      this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
+
     // Main client for general operations
     this.client = new Redis(redisUrl, {
       retryStrategy: (times) => {
@@ -23,7 +24,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     // Subscriber for pub/sub (if needed)
     this.subscriber = new Redis(redisUrl);
-    
+
     // Publisher for pub/sub (if needed)
     this.publisher = new Redis(redisUrl);
 
@@ -115,4 +116,3 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.client.expire(key, seconds);
   }
 }
-

@@ -33,9 +33,7 @@ export class AnalyticsController {
    * Get Rush Mode leaderboard for a session
    */
   @Get('sessions/:sessionId/leaderboard')
-  async getLeaderboard(
-    @Param('sessionId') sessionId: string,
-  ) {
+  async getLeaderboard(@Param('sessionId') sessionId: string) {
     return this.analyticsService.calculateRushLeaderboard(sessionId);
   }
 
@@ -44,10 +42,11 @@ export class AnalyticsController {
    * Get participant engagement metrics for a session
    */
   @Get('sessions/:sessionId/engagement')
-  async getParticipantEngagement(
-    @Param('sessionId') sessionId: string,
-  ) {
-    return this.analyticsService.calculateParticipantEngagement(sessionId, false);
+  async getParticipantEngagement(@Param('sessionId') sessionId: string) {
+    return this.analyticsService.calculateParticipantEngagement(
+      sessionId,
+      false,
+    );
   }
 
   /**
@@ -55,9 +54,7 @@ export class AnalyticsController {
    * Get anonymous statistics for Seminar Mode sessions
    */
   @Get('sessions/:sessionId/anonymous')
-  async getAnonymousStats(
-    @Param('sessionId') sessionId: string,
-  ) {
+  async getAnonymousStats(@Param('sessionId') sessionId: string) {
     return this.analyticsService.calculateAnonymousStats(sessionId);
   }
 

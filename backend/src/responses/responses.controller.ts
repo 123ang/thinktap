@@ -41,7 +41,10 @@ export class ResponsesController {
     @Query('userId') userId?: string,
     @Query('nickname') nickname?: string,
   ) {
-    return this.responsesService.getParticipantStats(sessionId, { userId, nickname });
+    return this.responsesService.getParticipantStats(sessionId, {
+      userId,
+      nickname,
+    });
   }
 
   @Get('top-rankings')
@@ -50,7 +53,10 @@ export class ResponsesController {
     @Param('sessionId') sessionId: string,
     @Query('limit') limit?: string,
   ) {
-    return this.responsesService.getTopRankings(sessionId, limit ? parseInt(limit) : 3);
+    return this.responsesService.getTopRankings(
+      sessionId,
+      limit ? parseInt(limit) : 3,
+    );
   }
 
   @Get('participants')
@@ -72,8 +78,10 @@ export class QuestionResponsesController {
 
   @Get('rankings')
   @UseGuards(JwtAuthGuard)
-  async getQuestionRankings(@Param('questionId') questionId: string) {
-    return this.responsesService.getQuestionRankings(questionId);
+  async getQuestionRankings(
+    @Param('questionId') questionId: string,
+    @Query('sessionId') sessionId: string,
+  ) {
+    return this.responsesService.getQuestionRankings(sessionId, questionId);
   }
 }
-

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateQuizDto, UpdateQuizDto } from './dto/quiz.dto';
 
@@ -18,10 +22,11 @@ export class QuizzesService {
       data: {
         title: createQuizDto.title,
         userId,
+        // Cast to any to satisfy Prisma's JSON input type
         settings: {
           ...defaultSettings,
           ...(createQuizDto.settings || {}),
-        },
+        } as any,
       },
       include: {
         _count: {
@@ -111,17 +116,23 @@ export class QuizzesService {
       throw new ForbiddenException('You do not have access to this quiz');
     }
 
+    // Normalize existing settings into a plain object so we can safely spread
+    const existingSettings: Record<string, any> =
+      quiz.settings && typeof quiz.settings === 'object'
+        ? (quiz.settings as any)
+        : {};
+
     const updated = await this.prismaService.quiz.update({
       where: { id: quizId },
       data: {
         title: updateQuizDto.title,
         // Merge existing settings with any provided updates, keeping defaults when absent.
         settings: updateQuizDto.settings
-          ? {
-              ...(quiz.settings || {}),
+          ? ({
+              ...existingSettings,
               ...updateQuizDto.settings,
-            }
-          : quiz.settings,
+            } as any)
+          : (quiz.settings as any),
         updatedAt: new Date(),
       },
       include: {
@@ -157,4 +168,3 @@ export class QuizzesService {
     return { deleted: true };
   }
 }
-

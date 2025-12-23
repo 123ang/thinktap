@@ -244,13 +244,14 @@ export default function LecturerSessionPage() {
 
   const handleEndSession = async () => {
     try {
+      console.log('[Lecturer] handleEndSession called with params.id:', sessionId, 'session.id:', session?.id);
       await api.sessions.updateStatus(sessionId, 'ENDED');
       endSession(sessionId);
       
       // Fetch top 3 rankings
       try {
         const rankings = await api.responses.getTopRankings(sessionId, 3);
-        console.log('Top rankings received:', rankings);
+        console.log('[Lecturer] Top rankings received for sessionId:', sessionId, rankings);
         setTopRankings(rankings);
         setShowPodium(true);
       } catch (error: any) {

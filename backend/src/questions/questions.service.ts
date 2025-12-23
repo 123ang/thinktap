@@ -10,7 +10,11 @@ import { CreateQuestionDto } from './dto/question.dto';
 export class QuestionsService {
   constructor(private prismaService: PrismaService) {}
 
-  async create(quizId: string, userId: string, createQuestionDto: CreateQuestionDto) {
+  async create(
+    quizId: string,
+    userId: string,
+    createQuestionDto: CreateQuestionDto,
+  ) {
     console.log('[QuestionsService] Creating question with DTO:', {
       quizId,
       type: createQuestionDto.type,
@@ -21,7 +25,7 @@ export class QuestionsService {
       timerSeconds: createQuestionDto.timerSeconds,
       order: createQuestionDto.order,
     });
-    
+
     // Verify quiz exists and user owns it
     const quiz = await this.prismaService.quiz.findUnique({
       where: { id: quizId },
@@ -36,7 +40,10 @@ export class QuestionsService {
     }
 
     // Ensure correctAnswer is not null or undefined
-    if (createQuestionDto.correctAnswer === null || createQuestionDto.correctAnswer === undefined) {
+    if (
+      createQuestionDto.correctAnswer === null ||
+      createQuestionDto.correctAnswer === undefined
+    ) {
       throw new Error('correctAnswer is required and cannot be null');
     }
 
@@ -129,7 +136,10 @@ export class QuestionsService {
   }
 
   async findOne(questionId: string) {
-    console.log('[QuestionsService] findOne called with questionId:', questionId);
+    console.log(
+      '[QuestionsService] findOne called with questionId:',
+      questionId,
+    );
     const question = await this.prismaService.question.findUnique({
       where: { id: questionId },
       include: {
@@ -190,4 +200,3 @@ export class QuestionsService {
     return { message: 'Question deleted successfully' };
   }
 }
-

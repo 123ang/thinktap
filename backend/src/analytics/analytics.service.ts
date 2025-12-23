@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Plan, SessionMode } from '@prisma/client';
 import {
@@ -16,7 +20,10 @@ export class AnalyticsService {
   /**
    * Get comprehensive session insights
    */
-  async getSessionInsights(sessionId: string, userId: string): Promise<SessionInsights> {
+  async getSessionInsights(
+    sessionId: string,
+    userId: string,
+  ): Promise<SessionInsights> {
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -58,15 +65,16 @@ export class AnalyticsService {
 
     // Check access permissions
     if (session.lecturerId !== userId) {
-      throw new ForbiddenException('Only the lecturer can view session insights');
+      throw new ForbiddenException(
+        'Only the lecturer can view session insights',
+      );
     }
 
     // Check if user has access to history
-    if (
-      session.lecturer.plan === Plan.FREE &&
-      session.status === 'ENDED'
-    ) {
-      throw new ForbiddenException('Session history not available on free plan');
+    if (session.lecturer.plan === Plan.FREE && session.status === 'ENDED') {
+      throw new ForbiddenException(
+        'Session history not available on free plan',
+      );
     }
 
     if (!session.quiz) {
@@ -94,19 +102,26 @@ export class AnalyticsService {
     const questionInsights: QuestionInsight[] = questions.map((question) => {
       const responses = question.responses;
       const totalResponses = responses.length;
-      const correctResponses = responses.filter((r) => r.isCorrect === true).length;
-      const incorrectResponses = responses.filter((r) => r.isCorrect === false).length;
+      const correctResponses = responses.filter(
+        (r) => r.isCorrect === true,
+      ).length;
+      const incorrectResponses = responses.filter(
+        (r) => r.isCorrect === false,
+      ).length;
 
       // Calculate average response time
       const avgResponseTime =
         totalResponses > 0
-          ? responses.reduce((sum, r) => sum + r.responseTimeMs, 0) / totalResponses
+          ? responses.reduce((sum, r) => sum + r.responseTimeMs, 0) /
+            totalResponses
           : 0;
 
       // Calculate fastest and slowest responses
       const responseTimes = responses.map((r) => r.responseTimeMs);
-      const fastestResponseMs = responseTimes.length > 0 ? Math.min(...responseTimes) : undefined;
-      const slowestResponseMs = responseTimes.length > 0 ? Math.max(...responseTimes) : undefined;
+      const fastestResponseMs =
+        responseTimes.length > 0 ? Math.min(...responseTimes) : undefined;
+      const slowestResponseMs =
+        responseTimes.length > 0 ? Math.max(...responseTimes) : undefined;
 
       // Response distribution
       const responseDistribution: Record<string, number> = {};
@@ -138,7 +153,9 @@ export class AnalyticsService {
       0,
     );
     const avgCorrectness =
-      questionInsights.length > 0 ? totalCorrectness / questionInsights.length : 0;
+      questionInsights.length > 0
+        ? totalCorrectness / questionInsights.length
+        : 0;
 
     // Calculate average response time across all questions
     const avgResponseTime =
@@ -167,15 +184,11 @@ export class AnalyticsService {
     // Add mode-specific insights
     if (session.mode === SessionMode.RUSH) {
       insights.leaderboard = await this.calculateRushLeaderboard(sessionId);
-      insights.participantEngagement = await this.calculateParticipantEngagement(
-        sessionId,
-        false,
-      );
+      insights.participantEngagement =
+        await this.calculateParticipantEngagement(sessionId, false);
     } else if (session.mode === SessionMode.THINKING) {
-      insights.participantEngagement = await this.calculateParticipantEngagement(
-        sessionId,
-        false,
-      );
+      insights.participantEngagement =
+        await this.calculateParticipantEngagement(sessionId, false);
     } else if (session.mode === SessionMode.SEMINAR) {
       insights.anonymousStats = await this.calculateAnonymousStats(sessionId);
     }
@@ -186,7 +199,9 @@ export class AnalyticsService {
   /**
    * Calculate Rush Mode leaderboard
    */
-  async calculateRushLeaderboard(sessionId: string): Promise<LeaderboardEntry[]> {
+  async calculateRushLeaderboard(
+    sessionId: string,
+  ): Promise<LeaderboardEntry[]> {
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -334,7 +349,7 @@ export class AnalyticsService {
 
     session.quiz.questions.forEach((question) => {
       question.responses.forEach((response) => {
-        const key = anonymous ? 'anonymous' : (response.userId || 'anonymous');
+        const key = anonymous ? 'anonymous' : response.userId || 'anonymous';
         const existing = participantStats.get(key) || {
           userId: response.userId || undefined,
           email: response.user?.email || undefined,
@@ -359,14 +374,14 @@ export class AnalyticsService {
         const participationRate =
           totalQuestions > 0 ? (p.totalResponses / totalQuestions) * 100 : 0;
         const correctnessRate =
-          p.totalResponses > 0 ? (p.correctResponses / p.totalResponses) * 100 : 0;
-        const avgResponseTime = p.totalResponses > 0 
-          ? p.totalResponseTime / p.totalResponses 
-          : 0;
+          p.totalResponses > 0
+            ? (p.correctResponses / p.totalResponses) * 100
+            : 0;
+        const avgResponseTime =
+          p.totalResponses > 0 ? p.totalResponseTime / p.totalResponses : 0;
 
         // Engagement score combines participation and correctness
-        const engagementScore =
-          (participationRate * 0.6 + correctnessRate * 0.4);
+        const engagementScore = participationRate * 0.6 + correctnessRate * 0.4;
 
         return {
           userId: p.userId,
@@ -553,7 +568,8 @@ export class AnalyticsService {
       totalResponses,
       totalParticipants,
       avgSessionDuration: Math.round(avgSessionDuration * 100) / 100,
-      avgParticipantsPerSession: Math.round(avgParticipantsPerSession * 100) / 100,
+      avgParticipantsPerSession:
+        Math.round(avgParticipantsPerSession * 100) / 100,
       avgQuestionsPerSession: Math.round(avgQuestionsPerSession * 100) / 100,
       avgResponsesPerQuestion: Math.round(avgResponsesPerQuestion * 100) / 100,
       mostUsedMode,
@@ -565,7 +581,10 @@ export class AnalyticsService {
   /**
    * Get question-level analytics
    */
-  async getQuestionAnalytics(questionId: string, userId: string): Promise<QuestionInsight> {
+  async getQuestionAnalytics(
+    questionId: string,
+    userId: string,
+  ): Promise<QuestionInsight> {
     const question = await this.prismaService.question.findUnique({
       where: { id: questionId },
       include: {
@@ -601,27 +620,35 @@ export class AnalyticsService {
     }
 
     // Check if user has access to history - find an ended session for this question
-    const endedSession = question.quiz.sessions.find(s => s.status === 'ENDED');
-    if (
-      question.quiz.user.plan === Plan.FREE &&
-      endedSession
-    ) {
-      throw new ForbiddenException('Question analytics not available on free plan');
+    const endedSession = question.quiz.sessions.find(
+      (s) => s.status === 'ENDED',
+    );
+    if (question.quiz.user.plan === Plan.FREE && endedSession) {
+      throw new ForbiddenException(
+        'Question analytics not available on free plan',
+      );
     }
 
     const responses = question.responses;
     const totalResponses = responses.length;
-    const correctResponses = responses.filter((r) => r.isCorrect === true).length;
-    const incorrectResponses = responses.filter((r) => r.isCorrect === false).length;
+    const correctResponses = responses.filter(
+      (r) => r.isCorrect === true,
+    ).length;
+    const incorrectResponses = responses.filter(
+      (r) => r.isCorrect === false,
+    ).length;
 
     const avgResponseTime =
       totalResponses > 0
-        ? responses.reduce((sum, r) => sum + r.responseTimeMs, 0) / totalResponses
+        ? responses.reduce((sum, r) => sum + r.responseTimeMs, 0) /
+          totalResponses
         : 0;
 
     const responseTimes = responses.map((r) => r.responseTimeMs);
-    const fastestResponseMs = responseTimes.length > 0 ? Math.min(...responseTimes) : undefined;
-    const slowestResponseMs = responseTimes.length > 0 ? Math.max(...responseTimes) : undefined;
+    const fastestResponseMs =
+      responseTimes.length > 0 ? Math.min(...responseTimes) : undefined;
+    const slowestResponseMs =
+      responseTimes.length > 0 ? Math.max(...responseTimes) : undefined;
 
     const responseDistribution: Record<string, number> = {};
     responses.forEach((r) => {

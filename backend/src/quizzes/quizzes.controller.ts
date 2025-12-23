@@ -47,4 +47,3 @@ export class QuizzesController {
     return this.quizzesService.delete(id, req.user.id);
   }
 }
-

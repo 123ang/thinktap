@@ -204,7 +204,11 @@ export class SessionsService {
     }
 
     // If userId provided, check access
-    if (userId && session.lecturerId !== userId && session.status !== SessionStatus.ACTIVE) {
+    if (
+      userId &&
+      session.lecturerId !== userId &&
+      session.status !== SessionStatus.ACTIVE
+    ) {
       throw new ForbiddenException('Access denied');
     }
 
@@ -235,7 +239,11 @@ export class SessionsService {
     return session;
   }
 
-  async updateStatus(sessionId: string, userId: string | null, status: SessionStatus) {
+  async updateStatus(
+    sessionId: string,
+    userId: string | null,
+    status: SessionStatus,
+  ) {
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
     });
@@ -247,7 +255,9 @@ export class SessionsService {
     // If userId is provided, enforce that only the lecturer can change status.
     // If userId is null (unauthenticated), allow for now (frontend route is already protected).
     if (userId && session.lecturerId !== userId) {
-      throw new ForbiddenException('Only the lecturer can update session status');
+      throw new ForbiddenException(
+        'Only the lecturer can update session status',
+      );
     }
 
     const updated = await this.prismaService.session.update({
@@ -360,7 +370,9 @@ export class SessionsService {
     }
 
     if (!session.isDeleted) {
-      throw new BadRequestException('Session must be in trash before permanent deletion');
+      throw new BadRequestException(
+        'Session must be in trash before permanent deletion',
+      );
     }
 
     await this.prismaService.session.delete({
@@ -375,7 +387,11 @@ export class SessionsService {
 
   async joinSession(
     sessionId: string,
-    joinData: { userId?: string; nickname?: string; role: 'lecturer' | 'student' },
+    joinData: {
+      userId?: string;
+      nickname?: string;
+      role: 'lecturer' | 'student';
+    },
   ) {
     // Verify session exists
     const session = await this.prismaService.session.findUnique({
@@ -399,7 +415,8 @@ export class SessionsService {
     }
 
     // Initialize session state in Redis if it doesn't exist
-    const existingState = await this.sessionStateService.getSessionState(sessionId);
+    const existingState =
+      await this.sessionStateService.getSessionState(sessionId);
     if (!existingState) {
       await this.sessionStateService.createSessionState(sessionId, {
         status: session.status === SessionStatus.ACTIVE ? 'waiting' : 'waiting',
@@ -408,11 +425,15 @@ export class SessionsService {
 
     // For students, check for duplicate nicknames
     if (joinData.role === 'student' && joinData.nickname) {
-      const participants = await this.sessionStateService.getParticipants(sessionId);
+      const participants =
+        await this.sessionStateService.getParticipants(sessionId);
       const existingNames: string[] = [];
-      
+
       for (const socketId of participants) {
-        const participant = await this.sessionStateService.getParticipant(sessionId, socketId);
+        const participant = await this.sessionStateService.getParticipant(
+          sessionId,
+          socketId,
+        );
         if (participant?.nickname) {
           existingNames.push(participant.nickname);
         }
@@ -438,4 +459,3 @@ export class SessionsService {
     };
   }
 }
-

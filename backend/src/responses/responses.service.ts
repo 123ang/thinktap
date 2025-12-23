@@ -22,9 +22,13 @@ export class ResponsesService {
       questionType === QuestionType.SHORT_ANSWER
     ) {
       // Simple string comparison (case-insensitive)
-      if (typeof userResponse === 'string' && typeof correctAnswer === 'string') {
+      if (
+        typeof userResponse === 'string' &&
+        typeof correctAnswer === 'string'
+      ) {
         return (
-          userResponse.trim().toLowerCase() === correctAnswer.trim().toLowerCase()
+          userResponse.trim().toLowerCase() ===
+          correctAnswer.trim().toLowerCase()
         );
       }
       // Check if correct answer is an array of acceptable answers
@@ -40,7 +44,10 @@ export class ResponsesService {
     if (questionType === QuestionType.TRUE_FALSE) {
       // For TRUE_FALSE, correctAnswer is stored as index (0 or 1)
       // userResponse is also an index from frontend
-      if (typeof userResponse === 'number' && typeof correctAnswer === 'number') {
+      if (
+        typeof userResponse === 'number' &&
+        typeof correctAnswer === 'number'
+      ) {
         return userResponse === correctAnswer;
       }
       // Fallback for old format (text comparison)
@@ -50,7 +57,10 @@ export class ResponsesService {
     if (questionType === QuestionType.MULTIPLE_CHOICE) {
       // For MULTIPLE_CHOICE, correctAnswer is stored as index
       // userResponse is also an index from frontend
-      if (typeof userResponse === 'number' && typeof correctAnswer === 'number') {
+      if (
+        typeof userResponse === 'number' &&
+        typeof correctAnswer === 'number'
+      ) {
         return userResponse === correctAnswer;
       }
       // Fallback for old format (text comparison)
@@ -62,8 +72,12 @@ export class ResponsesService {
         return false;
       }
       // Both should be arrays of indices
-      if (userResponse.length > 0 && typeof userResponse[0] === 'number' &&
-          correctAnswer.length > 0 && typeof correctAnswer[0] === 'number') {
+      if (
+        userResponse.length > 0 &&
+        typeof userResponse[0] === 'number' &&
+        correctAnswer.length > 0 &&
+        typeof correctAnswer[0] === 'number'
+      ) {
         // Compare indices directly
         const sorted1 = [...userResponse].sort((a, b) => a - b);
         const sorted2 = [...correctAnswer].sort((a, b) => a - b);
@@ -111,7 +125,7 @@ export class ResponsesService {
     }
 
     // Verify question belongs to a quiz that's used in this session
-    if (!question.quiz.sessions.some(s => s.id === sessionId)) {
+    if (!question.quiz.sessions.some((s) => s.id === sessionId)) {
       throw new BadRequestException('Question does not belong to this session');
     }
 
@@ -189,10 +203,15 @@ export class ResponsesService {
       const baseScore = 1000;
       const totalTimeSeconds = question.timerSeconds || 30;
       const timeTakenSeconds = submitResponseDto.responseTimeMs / 1000;
-      const speedFactor = Math.max(0, (totalTimeSeconds - timeTakenSeconds) / totalTimeSeconds);
+      const speedFactor = Math.max(
+        0,
+        (totalTimeSeconds - timeTakenSeconds) / totalTimeSeconds,
+      );
       const powerUpMultiplier = 1.0; // No power-ups implemented yet
-      
-      points = Math.round(baseScore * speedFactor * streakMultiplier * powerUpMultiplier);
+
+      points = Math.round(
+        baseScore * speedFactor * streakMultiplier * powerUpMultiplier,
+      );
     }
 
     // For Seminar mode, userId should be null (anonymous)
@@ -244,14 +263,15 @@ export class ResponsesService {
             order: true,
           },
         },
-        user: session.mode === SessionMode.SEMINAR
-          ? false
-          : {
-              select: {
-                id: true,
-                email: true,
+        user:
+          session.mode === SessionMode.SEMINAR
+            ? false
+            : {
+                select: {
+                  id: true,
+                  email: true,
+                },
               },
-            },
       },
       orderBy: {
         submittedAt: 'asc',
@@ -292,19 +312,21 @@ export class ResponsesService {
     }
 
     // Get session mode from first response, or default
-    const sessionMode = question.responses[0]?.session?.mode || SessionMode.RUSH;
+    const sessionMode =
+      question.responses[0]?.session?.mode || SessionMode.RUSH;
 
     const responses = await this.prismaService.response.findMany({
       where: { questionId },
       include: {
-        user: sessionMode === SessionMode.SEMINAR
-          ? false
-          : {
-              select: {
-                id: true,
-                email: true,
+        user:
+          sessionMode === SessionMode.SEMINAR
+            ? false
+            : {
+                select: {
+                  id: true,
+                  email: true,
+                },
               },
-            },
       },
       orderBy: {
         submittedAt: 'asc',
@@ -353,14 +375,13 @@ export class ResponsesService {
       sessionId,
       mode: session.mode,
       totalQuestions: questions.length,
-      totalResponses: questions.reduce(
-        (sum, q) => sum + q.responses.length,
-        0,
-      ),
+      totalResponses: questions.reduce((sum, q) => sum + q.responses.length, 0),
       questions: questions.map((question) => {
         const responses = question.responses;
         const totalResponses = responses.length;
-        const correctResponses = responses.filter((r) => r.isCorrect === true).length;
+        const correctResponses = responses.filter(
+          (r) => r.isCorrect === true,
+        ).length;
         const incorrectResponses = responses.filter(
           (r) => r.isCorrect === false,
         ).length;
@@ -426,7 +447,10 @@ export class ResponsesService {
     return insights;
   }
 
-  async getParticipantStats(sessionId: string, identifier: { userId?: string; nickname?: string }) {
+  async getParticipantStats(
+    sessionId: string,
+    identifier: { userId?: string; nickname?: string },
+  ) {
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -449,7 +473,9 @@ export class ResponsesService {
     } else if (identifier.nickname) {
       whereClause.nickname = identifier.nickname;
     } else {
-      throw new BadRequestException('Either userId or nickname must be provided');
+      throw new BadRequestException(
+        'Either userId or nickname must be provided',
+      );
     }
 
     const participantResponses = await this.prismaService.response.findMany({
@@ -471,9 +497,14 @@ export class ResponsesService {
 
     const totalQuestions = session.quiz.questions.length;
     const totalResponses = participantResponses.length;
-    const correctCount = participantResponses.filter((r) => r.isCorrect === true).length;
-    const wrongCount = participantResponses.filter((r) => r.isCorrect === false).length;
-    const accuracy = totalResponses > 0 ? (correctCount / totalResponses) * 100 : 0;
+    const correctCount = participantResponses.filter(
+      (r) => r.isCorrect === true,
+    ).length;
+    const wrongCount = participantResponses.filter(
+      (r) => r.isCorrect === false,
+    ).length;
+    const accuracy =
+      totalResponses > 0 ? (correctCount / totalResponses) * 100 : 0;
 
     // Calculate ranking - get all participants and their scores
     const allResponses = await this.prismaService.response.findMany({
@@ -487,8 +518,11 @@ export class ResponsesService {
     });
 
     // Group by participant (userId or nickname)
-    const participantScores = new Map<string, { correct: number; points: number; identifier: string }>();
-    
+    const participantScores = new Map<
+      string,
+      { correct: number; points: number; identifier: string }
+    >();
+
     allResponses.forEach((r) => {
       const key = r.userId || r.nickname || 'unknown';
       if (!participantScores.has(key)) {
@@ -502,17 +536,17 @@ export class ResponsesService {
     });
 
     // Sort by correct count (descending), then by points (descending)
-    const leaderboard = Array.from(participantScores.values())
-      .sort((a, b) => {
-        if (b.correct !== a.correct) {
-          return b.correct - a.correct;
-        }
-        return b.points - a.points;
-      });
+    const leaderboard = Array.from(participantScores.values()).sort((a, b) => {
+      if (b.correct !== a.correct) {
+        return b.correct - a.correct;
+      }
+      return b.points - a.points;
+    });
 
     // Find participant's rank
     const participantKey = identifier.userId || identifier.nickname || '';
-    const rank = leaderboard.findIndex((entry) => entry.identifier === participantKey) + 1;
+    const rank =
+      leaderboard.findIndex((entry) => entry.identifier === participantKey) + 1;
     const totalParticipants = leaderboard.length;
 
     return {
@@ -528,6 +562,14 @@ export class ResponsesService {
   }
 
   async getTopRankings(sessionId: string, limit: number = 3) {
+    // Debug logging to verify we are using the correct sessionId and data
+    console.log(
+      '[ResponsesService.getTopRankings] Called with sessionId:',
+      sessionId,
+      'limit:',
+      limit,
+    );
+
     const session = await this.prismaService.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -556,16 +598,32 @@ export class ResponsesService {
       },
     });
 
+    console.log(
+      '[ResponsesService.getTopRankings] Loaded responses count:',
+      allResponses.length,
+      'sample:',
+      allResponses.slice(0, 5).map((r) => ({
+        sessionId: r.sessionId,
+        userId: r.userId,
+        nickname: r.nickname,
+        points: r.points,
+        isCorrect: r.isCorrect,
+      })),
+    );
+
     // Group by participant (userId or nickname)
-    const participantScores = new Map<string, {
-      identifier: string;
-      userId: string | null;
-      nickname: string | null;
-      email: string | null;
-      correct: number;
-      points: number;
-      totalAnswered: number;
-    }>();
+    const participantScores = new Map<
+      string,
+      {
+        identifier: string;
+        userId: string | null;
+        nickname: string | null;
+        email: string | null;
+        correct: number;
+        points: number;
+        totalAnswered: number;
+      }
+    >();
 
     allResponses.forEach((r) => {
       const key = r.userId || r.nickname || 'unknown';
@@ -602,16 +660,24 @@ export class ResponsesService {
         userId: entry.userId,
         nickname: entry.nickname,
         email: entry.email,
-        username: entry.nickname || entry.email || `User ${entry.userId?.substring(0, 8) || 'Unknown'}`,
+        username:
+          entry.nickname ||
+          entry.email ||
+          `User ${entry.userId?.substring(0, 8) || 'Unknown'}`,
         correct: entry.correct,
         points: entry.points,
         totalAnswered: entry.totalAnswered,
       }));
 
+    console.log(
+      '[ResponsesService.getTopRankings] Returning leaderboard:',
+      leaderboard,
+    );
+
     return leaderboard;
   }
 
-  async getQuestionRankings(questionId: string) {
+  async getQuestionRankings(sessionId: string, questionId: string) {
     const question = await this.prismaService.question.findUnique({
       where: { id: questionId },
     });
@@ -620,9 +686,10 @@ export class ResponsesService {
       throw new NotFoundException('Question not found');
     }
 
-    // Get all correct responses for this question
+    // Get all correct responses for this question in THIS session only
     const responses = await this.prismaService.response.findMany({
       where: {
+        sessionId,
         questionId,
         isCorrect: true, // Only include correct answers in rankings
       },
@@ -632,16 +699,19 @@ export class ResponsesService {
     });
 
     // Group by participant (userId or nickname) and get best response for each
-    const participantResponses = new Map<string, {
-      userId: string | null;
-      nickname: string | null;
-      points: number;
-      responseTimeMs: number;
-    }>();
+    const participantResponses = new Map<
+      string,
+      {
+        userId: string | null;
+        nickname: string | null;
+        points: number;
+        responseTimeMs: number;
+      }
+    >();
 
     for (const response of responses) {
       const key = response.userId || response.nickname || 'unknown';
-      
+
       // Keep the best response per participant (highest points, or fastest if same points)
       if (!participantResponses.has(key)) {
         participantResponses.set(key, {
@@ -653,8 +723,11 @@ export class ResponsesService {
       } else {
         const existing = participantResponses.get(key)!;
         // Update if this response has more points, or same points but faster
-        if (response.points > existing.points || 
-            (response.points === existing.points && response.responseTimeMs < existing.responseTimeMs)) {
+        if (
+          response.points > existing.points ||
+          (response.points === existing.points &&
+            response.responseTimeMs < existing.responseTimeMs)
+        ) {
           participantResponses.set(key, {
             userId: response.userId,
             nickname: response.nickname,
@@ -677,7 +750,9 @@ export class ResponsesService {
         rank: index + 1,
         userId: entry.userId,
         nickname: entry.nickname,
-        username: entry.nickname || `User ${entry.userId?.substring(0, 8) || 'Unknown'}`,
+        username:
+          entry.nickname ||
+          `User ${entry.userId?.substring(0, 8) || 'Unknown'}`,
         points: entry.points,
         responseTimeMs: entry.responseTimeMs,
       }));
@@ -721,17 +796,20 @@ export class ResponsesService {
     });
 
     // Group responses by participant (userId or nickname)
-    const participantMap = new Map<string, {
-      userId: string | null;
-      nickname: string | null;
-      responses: Array<{
-        questionId: string;
-        isCorrect: boolean | null;
-        points: number;
-      }>;
-      totalPoints: number;
-      correctCount: number;
-    }>();
+    const participantMap = new Map<
+      string,
+      {
+        userId: string | null;
+        nickname: string | null;
+        responses: Array<{
+          questionId: string;
+          isCorrect: boolean | null;
+          points: number;
+        }>;
+        totalPoints: number;
+        correctCount: number;
+      }
+    >();
 
     allResponses.forEach((response) => {
       const key = response.userId || response.nickname || 'unknown';
@@ -754,17 +832,26 @@ export class ResponsesService {
       // Only count points and correct answers from the latest response per question
       // (in case of multiple responses, we want the best one)
       const existingResponseIndex = participant.responses.findIndex(
-        r => r.questionId === response.questionId
+        (r) => r.questionId === response.questionId,
       );
-      
+
       if (existingResponseIndex >= 0) {
         // Update if this response has more points
         const existingResponse = participant.responses[existingResponseIndex];
         if ((response.points || 0) > existingResponse.points) {
-          participant.totalPoints = participant.totalPoints - existingResponse.points + (response.points || 0);
-          if (existingResponse.isCorrect === true && response.isCorrect !== true) {
+          participant.totalPoints =
+            participant.totalPoints -
+            existingResponse.points +
+            (response.points || 0);
+          if (
+            existingResponse.isCorrect === true &&
+            response.isCorrect !== true
+          ) {
             participant.correctCount--;
-          } else if (existingResponse.isCorrect !== true && response.isCorrect === true) {
+          } else if (
+            existingResponse.isCorrect !== true &&
+            response.isCorrect === true
+          ) {
             participant.correctCount++;
           }
           participant.responses[existingResponseIndex] = {
@@ -788,25 +875,32 @@ export class ResponsesService {
     });
 
     // Convert to array and calculate unanswered questions
-    const participants = Array.from(participantMap.entries()).map(([key, data]) => {
-      const answeredQuestionIds = new Set(data.responses.map(r => r.questionId));
-      const unansweredCount = totalQuestions - answeredQuestionIds.size;
-      const correctPercentage = totalQuestions > 0 
-        ? Math.round((data.correctCount / totalQuestions) * 100) 
-        : 0;
+    const participants = Array.from(participantMap.entries()).map(
+      ([key, data]) => {
+        const answeredQuestionIds = new Set(
+          data.responses.map((r) => r.questionId),
+        );
+        const unansweredCount = totalQuestions - answeredQuestionIds.size;
+        const correctPercentage =
+          totalQuestions > 0
+            ? Math.round((data.correctCount / totalQuestions) * 100)
+            : 0;
 
-      return {
-        identifier: key,
-        userId: data.userId,
-        nickname: data.nickname,
-        username: data.nickname || `User ${data.userId?.substring(0, 8) || 'Unknown'}`,
-        correctCount: data.correctCount,
-        unansweredCount,
-        totalQuestions,
-        correctPercentage,
-        finalScore: data.totalPoints,
-      };
-    });
+        return {
+          identifier: key,
+          userId: data.userId,
+          nickname: data.nickname,
+          username:
+            data.nickname ||
+            `User ${data.userId?.substring(0, 8) || 'Unknown'}`,
+          correctCount: data.correctCount,
+          unansweredCount,
+          totalQuestions,
+          correctPercentage,
+          finalScore: data.totalPoints,
+        };
+      },
+    );
 
     // Sort by final score (descending) to assign ranks
     participants.sort((a, b) => {
@@ -820,7 +914,10 @@ export class ResponsesService {
     // Assign ranks (handle ties)
     let currentRank = 1;
     participants.forEach((participant, index) => {
-      if (index > 0 && participants[index - 1].finalScore !== participant.finalScore) {
+      if (
+        index > 0 &&
+        participants[index - 1].finalScore !== participant.finalScore
+      ) {
         currentRank = index + 1;
       }
       participant['rank'] = currentRank;
@@ -829,4 +926,3 @@ export class ResponsesService {
     return participants;
   }
 }
-

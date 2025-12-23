@@ -10,4 +10,3 @@ import { PrismaModule } from '../prisma/prisma.module';
   exports: [QuizzesService],
 })
 export class QuizzesModule {}
-
