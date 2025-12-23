@@ -7,10 +7,21 @@ export class QuizzesService {
   constructor(private prismaService: PrismaService) {}
 
   async create(userId: string, createQuizDto: CreateQuizDto) {
+    const defaultSettings = {
+      musicEnabled: true,
+      musicTrack: 'jumanji_drum.mp3',
+      countdownEnabled: true,
+      podiumEnabled: true,
+    };
+
     const quiz = await this.prismaService.quiz.create({
       data: {
         title: createQuizDto.title,
         userId,
+        settings: {
+          ...defaultSettings,
+          ...(createQuizDto.settings || {}),
+        },
       },
       include: {
         _count: {
@@ -104,6 +115,13 @@ export class QuizzesService {
       where: { id: quizId },
       data: {
         title: updateQuizDto.title,
+        // Merge existing settings with any provided updates, keeping defaults when absent.
+        settings: updateQuizDto.settings
+          ? {
+              ...(quiz.settings || {}),
+              ...updateQuizDto.settings,
+            }
+          : quiz.settings,
         updatedAt: new Date(),
       },
       include: {

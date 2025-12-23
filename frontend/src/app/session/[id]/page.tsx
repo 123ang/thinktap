@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useSocket, useAuth, useQuestions } from '@/hooks';
@@ -10,7 +10,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { SessionStatus, ModeStatus } from '@/components/SessionStatus';
 import { toast } from 'sonner';
 import api from '@/lib/api';
-import { Session, CreateQuestionDto, QuestionType } from '@/types/api';
+import { Session, CreateQuestionDto, QuestionType, QuizSettings } from '@/types/api';
 import { 
   ArrowLeft, 
   Users, 
@@ -20,7 +20,9 @@ import {
   BarChart,
   Copy,
   CheckCircle,
-  Clock
+  Clock,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import Link from 'next/link';
 import { Podium } from '@/components/Podium';
@@ -59,6 +61,8 @@ export default function LecturerSessionPage() {
   const [topRankings, setTopRankings] = useState<any[]>([]);
   const [pendingQuestionId, setPendingQuestionId] = useState<string | null>(null);
   const [hasSeenCountdown, setHasSeenCountdown] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const {
     connected,
@@ -77,6 +81,12 @@ export default function LecturerSessionPage() {
     socket,
   } = useSocket({ sessionCode: session?.code, role: 'lecturer' });
 
+  const quizSettings: QuizSettings | undefined = session?.quiz?.settings as QuizSettings | undefined;
+  const musicEnabled = quizSettings?.musicEnabled ?? true;
+  const musicTrack = quizSettings?.musicTrack ?? 'jumanji_drum.mp3';
+  const countdownEnabled = quizSettings?.countdownEnabled ?? true;
+  const podiumEnabled = quizSettings?.podiumEnabled ?? true;
+
   // Debug: Log when results change
   useEffect(() => {
     console.log('[Lecturer] Results state changed:', results);
@@ -85,6 +95,37 @@ export default function LecturerSessionPage() {
   useEffect(() => {
     loadSession();
   }, [sessionId]);
+
+  // Initialise background music player for lecturer screen only
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!audioRef.current) {
+      const audio = new Audio(`/` + musicTrack);
+      audio.loop = true;
+      audioRef.current = audio;
+    } else {
+      // Update track if settings changed
+      if (audioRef.current.src && !audioRef.current.src.endsWith(`/${musicTrack}`)) {
+        audioRef.current.src = `/${musicTrack}`;
+        audioRef.current.loop = true;
+      }
+    }
+
+    const audio = audioRef.current;
+    if (musicEnabled && !isMuted) {
+      audio
+        .play()
+        .catch(() => {
+          // Autoplay might be blocked; user can start via unmute toggle.
+        });
+    } else {
+      audio.pause();
+    }
+
+    return () => {
+      audio.pause();
+    };
+  }, [musicEnabled, musicTrack, isMuted]);
 
   // Clear question state if session is not ACTIVE (to prevent showing stale questions)
   useEffect(() => {
@@ -249,7 +290,7 @@ export default function LecturerSessionPage() {
     });
 
     // If this is the first question (no currentQuestion yet), broadcast a 5-second countdown
-    if (!currentQuestion && preCountdown === null && !hasSeenCountdown) {
+    if (countdownEnabled && !currentQuestion && preCountdown === null && !hasSeenCountdown) {
       console.log('[Lecturer] Starting pre-countdown for first question');
       setPendingQuestionId(questionId);
       setHasSeenCountdown(false);
@@ -287,7 +328,7 @@ export default function LecturerSessionPage() {
   };
 
   // Show podium when session ends
-  if (showPodium) {
+  if (showPodium && podiumEnabled) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-gradient-to-br from-rose-500 via-orange-400 to-amber-300 flex items-center justify-center p-4">
@@ -563,9 +604,10 @@ export default function LecturerSessionPage() {
                     {t('lecturer.readyToStart')}
                   </div>
                   <div className="flex flex-col items-center gap-4">
-                    <p className="text-lg text-gray-700">
-                      {questions.length} {questions.length === 1 ? t('lecturer.question') : t('lecturer.questions')} {t('lecturer.ready')}
-                    </p>
+                    <div className="text-lg text-gray-700 text-center">
+                      <div>{questions.length} {questions.length === 1 ? t('lecturer.question') : t('lecturer.questions')}</div>
+                      <div>{t('lecturer.ready')}</div>
+                    </div>
                     {!connected && (
                       <p className="text-sm text-amber-600">{t('lecturer.connecting')}</p>
                     )}
@@ -613,6 +655,20 @@ export default function LecturerSessionPage() {
           </div>
           )}
         </div>
+      </div>
+
+      {/* Background music mute/unmute toggle – lecturer screen only */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="rounded-full shadow-md bg-white/90"
+          onClick={() => setIsMuted((prev) => !prev)}
+          aria-label={isMuted ? t('lecturer.unmuteMusic') ?? 'Unmute background music' : t('lecturer.muteMusic') ?? 'Mute background music'}
+        >
+          {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+        </Button>
       </div>
     </ProtectedRoute>
   );

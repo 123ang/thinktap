@@ -56,6 +56,17 @@ export interface Quiz {
     questions: number;
     sessions: number;
   };
+  // Optional quiz-level settings (background music, countdown, podium, etc.)
+  settings?: QuizSettings;
+}
+
+export interface QuizSettings {
+  musicEnabled?: boolean;
+  // File name or relative path for the background music track.
+  // For now the default is "jumanji_drum.mp3" and the file should live under Next.js public.
+  musicTrack?: string;
+  countdownEnabled?: boolean;
+  podiumEnabled?: boolean;
 }
 
 export interface Session {
@@ -121,10 +132,12 @@ export interface AuthResponse {
 
 export interface CreateQuizDto {
   title: string;
+  settings?: QuizSettings;
 }
 
 export interface UpdateQuizDto {
   title?: string;
+  settings?: QuizSettings;
 }
 
 export interface CreateSessionDto {

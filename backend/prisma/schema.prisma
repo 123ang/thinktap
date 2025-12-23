@@ -30,14 +30,23 @@ model User {
 
 // Quiz Model - Reusable content that can be hosted in multiple sessions
 model Quiz {
-  id        String     @id @default(uuid())
+  id        String   @id @default(uuid())
   title     String
   userId    String
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   questions Question[]
   sessions  Session[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  /// JSON settings for this quiz, including background music, countdown, podium, etc.
+  /// Example shape (extensible in the future):
+  /// {
+  ///   "musicEnabled": true,
+  ///   "musicTrack": "jumanji_drum.mp3",
+  ///   "countdownEnabled": true,
+  ///   "podiumEnabled": true
+  /// }
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@map("quiz")

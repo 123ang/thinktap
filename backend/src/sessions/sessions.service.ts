@@ -122,6 +122,7 @@ export class SessionsService {
       where: {
         lecturerId: userId,
         status: SessionStatus.ENDED,
+        endedAt: { not: null }, // Only include sessions that have actually ended
         isDeleted: includeDeleted ? undefined : false,
       },
       include: {

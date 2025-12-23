@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import api from '@/lib/api';
 import { useSocket } from '@/hooks';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export default function WaitingForQuizPage() {
   const params = useParams();
@@ -14,6 +16,7 @@ export default function WaitingForQuizPage() {
   const [nickname, setNickname] = useState<string | null>(null);
   const { socket, connected, currentQuestion, preCountdown } = useSocket({ autoConnect: true });
   const hasJoined = useRef(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -59,6 +62,11 @@ export default function WaitingForQuizPage() {
 
         console.log('[Waiting] Joined session:', result);
 
+        // Mark as joined for this session so we don't re-join from participant view
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`thinktap-joined-${actualSessionId}`, '1');
+        }
+
         // After HTTP join, join Socket.IO room for broadcasts
         if (socket) {
           socket.emit('join_room', {
@@ -101,11 +109,11 @@ export default function WaitingForQuizPage() {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-rose-500 via-orange-400 to-amber-300 z-50 flex flex-col items-center justify-center">
         <div className="text-center space-y-8">
-          <p className="text-2xl text-white/90 font-medium">Get Ready!</p>
+          <p className="text-2xl text-white/90 font-medium">{t('waiting.getReady')}</p>
           <div className="w-48 h-48 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
             <span className="text-9xl font-bold text-white">{preCountdown}</span>
           </div>
-          <p className="text-xl text-white/80">Quiz starting soon...</p>
+          <p className="text-xl text-white/80">{t('waiting.quizStarting')}</p>
         </div>
       </div>
     );
@@ -115,20 +123,25 @@ export default function WaitingForQuizPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-sky-100 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-xl text-center">You&apos;re in!</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl text-center flex-1">{t('waiting.youreIn')}</CardTitle>
+            <div className="ml-2">
+              <LanguageSwitcher />
+            </div>
+          </div>
           <CardDescription className="text-center">
-            Did you see your nickname on screen?
+            {t('waiting.seeNickname')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-center">
-            <p className="text-sm text-muted-foreground mb-1">Your nickname</p>
+            <p className="text-sm text-muted-foreground mb-1">{t('waiting.yourNickname')}</p>
             <p className="text-2xl font-bold">
-              {nickname || 'Waiting...'}
+              {nickname || t('waiting.waiting')}
             </p>
           </div>
           <p className="text-center text-sm text-muted-foreground mt-4">
-            Please wait while your lecturer starts the quiz.
+            {t('waiting.waitLecturer')}
           </p>
         </CardContent>
       </Card>

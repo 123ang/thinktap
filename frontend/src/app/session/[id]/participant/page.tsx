@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import api from '@/lib/api';
 import { Session, Question, QuestionType } from '@/types/api';
 import { Clock, CheckCircle, XCircle, Trophy, Award, Target, TrendingUp } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export default function ParticipantSessionPage() {
   const params = useParams();
@@ -40,6 +42,8 @@ export default function ParticipantSessionPage() {
     points: number;
   } | null>(null);
 
+  const { t } = useLanguage();
+
   // Socket.IO only for receiving broadcasts
   const {
     connected,
@@ -63,32 +67,61 @@ export default function ParticipantSessionPage() {
   const hasJoinedRef = useRef(false);
   useEffect(() => {
     const joinSession = async () => {
-      if (session?.id && nickname && connected && socket && !hasJoinedRef.current) {
-        try {
+      if (!session?.id || !nickname || !connected || !socket || hasJoinedRef.current) {
+        return;
+      }
+
+      try {
+        console.log('[Participant] Checking join state for session:', session.id, nickname);
+        let alreadyJoined = false;
+
+        if (typeof window !== 'undefined') {
+          const joinedFlag = localStorage.getItem(`thinktap-joined-${session.id}`);
+          alreadyJoined = joinedFlag === '1';
+        }
+
+        hasJoinedRef.current = true;
+
+        // If we already joined from the waiting screen, skip HTTP join and only join the socket room.
+        if (!alreadyJoined) {
           console.log('[Participant] Joining session via HTTP:', session.id, nickname);
-          hasJoinedRef.current = true;
-          
-          // Join via HTTP endpoint
-          const result = await api.sessions.join(session.id, {
-            nickname,
-            role: 'student',
-          });
-          
-          console.log('[Participant] Joined session:', result);
-          
-          // After HTTP join, join Socket.IO room for broadcasts
-          if (socket) {
-            socket.emit('join_room', {
-              sessionId: session.id,
+          try {
+            const result = await api.sessions.join(session.id, {
               nickname,
               role: 'student',
             });
+            console.log('[Participant] Joined session via HTTP:', result);
+
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`thinktap-joined-${session.id}`, '1');
+            }
+          } catch (error: any) {
+            // If the nickname is already taken (400 from backend), treat as already joined
+            const message = error?.response?.data?.message as string | undefined;
+            const status = error?.response?.status;
+            if (status === 400 && message && message.toLowerCase().includes('nickname')) {
+              console.warn('[Participant] HTTP join reported duplicate nickname; treating as already joined.');
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(`thinktap-joined-${session.id}`, '1');
+              }
+            } else {
+              console.error('[Participant] Failed to join session:', error);
+              toast.error(message || 'Failed to join session');
+              hasJoinedRef.current = false;
+              return;
+            }
           }
-        } catch (error: any) {
-          console.error('[Participant] Failed to join session:', error);
-          toast.error(error?.response?.data?.message || 'Failed to join session');
-          hasJoinedRef.current = false;
         }
+
+        // After successful/assumed join, join Socket.IO room for broadcasts
+        socket.emit('join_room', {
+          sessionId: session.id,
+          nickname,
+          role: 'student',
+        });
+      } catch (error) {
+        console.error('[Participant] Unexpected error during join:', error);
+        hasJoinedRef.current = false;
       }
     };
 
@@ -149,7 +182,7 @@ export default function ParticipantSessionPage() {
         setParticipantStats(stats);
       } catch (error) {
         console.error('Error fetching participant stats:', error);
-        toast.error('Failed to load your results');
+        toast.error(t('participant.failedLoadResults'));
       }
     };
 
@@ -214,7 +247,7 @@ export default function ParticipantSessionPage() {
       setSession(data);
     } catch (error) {
       console.error('Error loading session:', error);
-      toast.error('Failed to load session');
+      toast.error(t('participant.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -254,15 +287,15 @@ export default function ParticipantSessionPage() {
       await api.responses.submit(sessionId, {
         questionId: currentQuestion.id,
         response: finalResponse, // Sending index(es) instead of text
-      responseTimeMs,
+        responseTimeMs,
         nickname: nickname || undefined,
-    });
+      });
 
-    setResponseSubmitted(true);
-    toast.success('Response submitted!');
+      setResponseSubmitted(true);
+      toast.success(t('participant.responseSubmitted'));
     } catch (error: any) {
       console.error('[Participant] Failed to submit response:', error);
-      toast.error(error?.response?.data?.message || 'Failed to submit response');
+      toast.error(error?.response?.data?.message || t('participant.failedSubmit'));
     }
   };
 
@@ -334,9 +367,9 @@ export default function ParticipantSessionPage() {
       case QuestionType.LONG_ANSWER:
         return (
           <Textarea
-            placeholder="Type your answer..."
-            value={response || ''}
-            onChange={(e) => setResponse(e.target.value)}
+            placeholder={t('participant.enterLongAnswer') ?? 'Type your answer...'}
+            value={(response as any) || ''}
+            onChange={(e) => setResponse(e.target.value as any)}
             disabled={responseSubmitted}
             rows={6}
           />
@@ -352,11 +385,11 @@ export default function ParticipantSessionPage() {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-rose-500 via-orange-400 to-amber-300 z-50 flex flex-col items-center justify-center">
         <div className="text-center space-y-8">
-          <p className="text-2xl text-white/90 font-medium">Get Ready!</p>
+          <p className="text-2xl text-white/90 font-medium">{t('participant.getReady')}</p>
           <div className="w-48 h-48 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
             <span className="text-9xl font-bold text-white">{preCountdown}</span>
           </div>
-          <p className="text-xl text-white/80">Quiz starting soon...</p>
+          <p className="text-xl text-white/80">{t('participant.quizStarting')}</p>
         </div>
       </div>
     );
@@ -372,9 +405,13 @@ export default function ParticipantSessionPage() {
               <div className="flex justify-center mb-4">
                 <Trophy className="h-16 w-16 text-amber-500" />
               </div>
-              <CardTitle className="text-3xl font-bold">Session Complete!</CardTitle>
+              <CardTitle className="text-3xl font-bold">
+                {t('participant.sessionCompleteTitle')}
+              </CardTitle>
               <CardDescription className="text-lg">
-                {nickname ? `Great job, ${nickname}!` : 'Great job!'}
+                {nickname
+                  ? t('participant.greatJobWithName', { name: nickname })
+                  : t('participant.greatJob')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -384,11 +421,13 @@ export default function ParticipantSessionPage() {
                   <div className="flex items-center justify-center gap-3 mb-2">
                     <Award className="h-8 w-8 text-amber-600" />
                     <span className="text-2xl font-bold text-amber-800">
-                      Rank #{participantStats.rank}
+                      {t('participant.rankOf', { rank: participantStats.rank ?? 0 })}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">
-                    Out of {participantStats.totalParticipants} participants
+                    {t('participant.outOfParticipants', {
+                      count: participantStats.totalParticipants,
+                    })}
                   </p>
                 </div>
               )}
@@ -399,7 +438,7 @@ export default function ParticipantSessionPage() {
                   <CardContent className="pt-4 text-center">
                     <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
                     <p className="text-3xl font-bold text-green-700">{participantStats.correctCount}</p>
-                    <p className="text-sm text-gray-600 mt-1">Correct</p>
+                    <p className="text-sm text-gray-600 mt-1">{t('participant.correct')}</p>
                   </CardContent>
                 </Card>
 
@@ -407,7 +446,7 @@ export default function ParticipantSessionPage() {
                   <CardContent className="pt-4 text-center">
                     <XCircle className="h-8 w-8 text-red-600 mx-auto mb-2" />
                     <p className="text-3xl font-bold text-red-700">{participantStats.wrongCount}</p>
-                    <p className="text-sm text-gray-600 mt-1">Wrong</p>
+                    <p className="text-sm text-gray-600 mt-1">{t('participant.incorrect')}</p>
                   </CardContent>
                 </Card>
 
@@ -415,7 +454,7 @@ export default function ParticipantSessionPage() {
                   <CardContent className="pt-4 text-center">
                     <Target className="h-8 w-8 text-blue-600 mx-auto mb-2" />
                     <p className="text-3xl font-bold text-blue-700">{participantStats.accuracy.toFixed(1)}%</p>
-                    <p className="text-sm text-gray-600 mt-1">Accuracy</p>
+                    <p className="text-sm text-gray-600 mt-1">{t('participant.accuracy')}</p>
                   </CardContent>
                 </Card>
 
@@ -423,7 +462,7 @@ export default function ParticipantSessionPage() {
                   <CardContent className="pt-4 text-center">
                     <TrendingUp className="h-8 w-8 text-purple-600 mx-auto mb-2" />
                     <p className="text-3xl font-bold text-purple-700">{participantStats.points}</p>
-                    <p className="text-sm text-gray-600 mt-1">Points</p>
+                    <p className="text-sm text-gray-600 mt-1">{t('participant.points')}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -431,8 +470,10 @@ export default function ParticipantSessionPage() {
               {/* Summary */}
               <div className="text-center p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600">
-                  You answered <span className="font-bold">{participantStats.totalResponses}</span> out of{' '}
-                  <span className="font-bold">{participantStats.totalQuestions}</span> questions
+                  {t('participant.summary', {
+                    responses: participantStats.totalResponses,
+                    questions: participantStats.totalQuestions,
+                  })}
                 </p>
               </div>
             </CardContent>
@@ -679,18 +720,23 @@ export default function ParticipantSessionPage() {
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 p-4">
       <div className="container mx-auto max-w-3xl py-8">
         {/* Session Header */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Session {session?.code}</CardTitle>
-                <CardDescription>
-                  {connected ? 'Connected' : 'Disconnected'}
-                </CardDescription>
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>
+                    {session?.code
+                      ? t('participant.sessionCode', { code: session.code }) || `Session ${session.code}`
+                      : 'Session'}
+                  </CardTitle>
+                  <CardDescription>
+                    {connected ? t('lecturer.connected') : t('lecturer.disconnected')}
+                  </CardDescription>
+                </div>
+                <LanguageSwitcher />
               </div>
-            </div>
-          </CardHeader>
-        </Card>
+            </CardHeader>
+          </Card>
 
         {/* Results or Waiting */}
         {results ? (

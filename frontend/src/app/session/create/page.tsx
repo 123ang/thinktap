@@ -9,8 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Spinner } from '@/components/ui/spinner';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { SessionMode, QuestionType, CreateQuestionDto } from '@/types/api';
@@ -33,6 +33,13 @@ type SidebarQuestion = {
   correctAnswer?: any;
   isDraft?: boolean;
   pointsMode?: PointsMode;
+};
+
+type QuizSettingsState = {
+  musicEnabled: boolean;
+  musicTrack: string;
+  countdownEnabled: boolean;
+  podiumEnabled: boolean;
 };
 
 function CreateSessionPageContent() {
@@ -65,6 +72,12 @@ function CreateSessionPageContent() {
   const [options, setOptions] = useState<string[]>(['', '', '', '']);
   const [correctIndexes, setCorrectIndexes] = useState<number[]>([0]);
   const [loading, setLoading] = useState(false);
+  const [quizSettings, setQuizSettings] = useState<QuizSettingsState>({
+    musicEnabled: true,
+    musicTrack: 'jumanji_drum.mp3',
+    countdownEnabled: true,
+    podiumEnabled: true,
+  });
 
   const updateCurrentSidebarQuestion = (partial: Partial<SidebarQuestion>) => {
     if (!selectedQuestionId) return;
@@ -205,7 +218,10 @@ function CreateSessionPageContent() {
       let activeQuizId = sessionId;
       if (!activeQuizId) {
         const quizTitle = title.trim() || t('dashboard.untitledQuiz');
-        const quiz = await api.quizzes.create({ title: quizTitle });
+        const quiz = await api.quizzes.create({
+          title: quizTitle,
+          settings: quizSettings,
+        });
         activeQuizId = quiz.id;
         setSessionId(quiz.id);
         if (typeof window !== 'undefined') {
@@ -320,7 +336,10 @@ function CreateSessionPageContent() {
       if (!activeQuizId) {
         // Create a Quiz first (not a Session)
         const quizTitle = title.trim() || t('dashboard.untitledQuiz');
-        const quiz = await api.quizzes.create({ title: quizTitle });
+        const quiz = await api.quizzes.create({
+          title: quizTitle,
+          settings: quizSettings,
+        });
         activeQuizId = quiz.id;
         setSessionId(quiz.id); // Using sessionId state to store quizId
         // Persist title for this quiz
@@ -332,11 +351,14 @@ function CreateSessionPageContent() {
       } else if (typeof window !== 'undefined' && title.trim()) {
         // Update quiz title if it changed
         localStorage.setItem(`thinktap-title-${activeQuizId}`, title.trim());
-        // Optionally update the quiz title via API
+        // Optionally update the quiz title and settings via API
         try {
-          await api.quizzes.update(activeQuizId, { title: title.trim() });
+          await api.quizzes.update(activeQuizId, {
+            title: title.trim(),
+            settings: quizSettings,
+          });
         } catch (e) {
-          console.error('Error updating quiz title:', e);
+          console.error('Error updating quiz title/settings:', e);
         }
       }
 
@@ -569,8 +591,17 @@ function CreateSessionPageContent() {
           } else {
             console.log('[Edit Quiz] Quiz has no title');
           }
+
+          // Load quiz-level settings (music, countdown, podium, etc.)
+          const s = (quiz as any).settings as Partial<QuizSettingsState> | undefined;
+          setQuizSettings({
+            musicEnabled: s?.musicEnabled ?? true,
+            musicTrack: s?.musicTrack ?? 'jumanji_drum.mp3',
+            countdownEnabled: s?.countdownEnabled ?? true,
+            podiumEnabled: s?.podiumEnabled ?? true,
+          });
         } catch (error) {
-          console.error('[Edit Quiz] Error loading quiz title:', error);
+          console.error('[Edit Quiz] Error loading quiz title/settings:', error);
           // Fallback to localStorage if API fails
           if (typeof window !== 'undefined') {
             const storedTitle = localStorage.getItem(`thinktap-title-${sessionId}`);
@@ -1049,6 +1080,75 @@ function CreateSessionPageContent() {
                       <SelectItem value="DOUBLE">{t('builder.double')}</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Quiz-level settings (stored in DB) */}
+                <div className="mt-4 rounded-lg border bg-white/80 px-3 py-3 space-y-3">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                    {t('builder.quizSettings') ?? 'Quiz settings'}
+                  </p>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="musicEnabled"
+                      checked={quizSettings.musicEnabled}
+                      onCheckedChange={(checked) =>
+                        setQuizSettings((prev) => ({
+                          ...prev,
+                          musicEnabled: Boolean(checked),
+                        }))
+                      }
+                    />
+                    <Label htmlFor="musicEnabled" className="text-xs">
+                      {t('builder.enableMusic') ?? 'Enable background music (lecturer only)'}
+                    </Label>
+                  </div>
+                  <div>
+                    <Label htmlFor="musicTrack" className="text-[11px] text-muted-foreground">
+                      {t('builder.musicTrack') ?? 'Music file name'}
+                    </Label>
+                    <Input
+                      id="musicTrack"
+                      value={quizSettings.musicTrack}
+                      onChange={(e) =>
+                        setQuizSettings((prev) => ({
+                          ...prev,
+                          musicTrack: e.target.value || 'jumanji_drum.mp3',
+                        }))
+                      }
+                      className="mt-1 h-8 text-xs"
+                      placeholder="jumanji_drum.mp3"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="countdownEnabled"
+                      checked={quizSettings.countdownEnabled}
+                      onCheckedChange={(checked) =>
+                        setQuizSettings((prev) => ({
+                          ...prev,
+                          countdownEnabled: Boolean(checked),
+                        }))
+                      }
+                    />
+                    <Label htmlFor="countdownEnabled" className="text-xs">
+                      {t('builder.enableCountdown') ?? 'Enable 5 second countdown before first question'}
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="podiumEnabled"
+                      checked={quizSettings.podiumEnabled}
+                      onCheckedChange={(checked) =>
+                        setQuizSettings((prev) => ({
+                          ...prev,
+                          podiumEnabled: Boolean(checked),
+                        }))
+                      }
+                    />
+                    <Label htmlFor="podiumEnabled" className="text-xs">
+                      {t('builder.enablePodium') ?? 'Show podium at end of session'}
+                    </Label>
+                  </div>
                 </div>
 
                 {sessionId && (

@@ -10,8 +10,11 @@ import { toast } from 'sonner';
 import api from '@/lib/api';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export default function JoinSessionPage() {
+  const { t } = useLanguage();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -24,19 +27,19 @@ export default function JoinSessionPage() {
 
   const handleJoin = async () => {
     if (code.length !== 6) {
-      toast.error('Please enter a valid 6-digit code');
+      toast.error(t('join.invalidCode'));
       return;
     }
     setLoading(true);
 
     try {
       const session = await api.sessions.getByCode(code);
-      toast.success('Session found! Enter your nickname to join.');
+      toast.success(t('join.sessionFound'));
       // After validating the PIN, send the user to the nickname page
       router.push(`/session/${session.id}/join`);
     } catch (error: any) {
       console.error('Error joining session:', error);
-      const errorMessage = error.response?.data?.message || 'Invalid session code';
+      const errorMessage = error.response?.data?.message || t('join.invalidCode');
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -53,17 +56,18 @@ export default function JoinSessionPage() {
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center justify-between mb-2">
             <Link href="/">
               <Button variant="ghost" size="sm">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
+                {t('common.back')}
               </Button>
             </Link>
+            <LanguageSwitcher />
           </div>
-          <CardTitle className="text-2xl text-center">Join Session</CardTitle>
+          <CardTitle className="text-2xl text-center">{t('join.title')}</CardTitle>
           <CardDescription className="text-center">
-            Enter the 6-digit code provided by your lecturer
+            {t('join.description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -83,7 +87,7 @@ export default function JoinSessionPage() {
               />
             </div>
             <p className="text-sm text-center text-muted-foreground">
-              {code.length}/6 digits entered
+              {t('join.digitsEntered', { count: code.length, total: 6 })}
             </p>
           </div>
 
@@ -96,10 +100,10 @@ export default function JoinSessionPage() {
               {loading ? (
                 <>
                   <Spinner size="sm" className="mr-2" />
-                  Joining...
+                  {t('join.joining')}
                 </>
               ) : (
-                'Join Session'
+                t('join.button')
               )}
             </Button>
 
@@ -124,15 +128,15 @@ export default function JoinSessionPage() {
               disabled={loading || code.length === 0}
               className="w-full"
             >
-              Clear
+              {t('join.clear')}
             </Button>
           </div>
 
           <div className="pt-4 border-t">
             <p className="text-xs text-center text-muted-foreground">
-              Don't have a code? Ask your lecturer or{' '}
+              {t('join.noCode')}{' '}
               <Link href="/login" className="text-red-600 hover:underline">
-                sign in as a lecturer
+                {t('join.signInAsLecturer')}
               </Link>
             </p>
           </div>

@@ -7,7 +7,7 @@ type LanguageCode = 'en' | 'zh' | 'ms' | 'ja';
 interface LanguageContextType {
   language: LanguageCode;
   setLanguage: (lang: LanguageCode) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
@@ -320,6 +320,13 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'participant.failedLoadResults': 'Failed to load your results',
     'participant.getReady': 'Get Ready!',
     'participant.quizStarting': 'Quiz starting soon...',
+    'participant.sessionCompleteTitle': 'Session Complete!',
+    'participant.greatJobWithName': 'Great job, {name}!',
+    'participant.greatJob': 'Great job!',
+    'participant.rankOf': 'Rank #{rank}',
+    'participant.outOfParticipants': 'Out of {count} participants',
+    'participant.summary': 'You answered {responses} out of {questions} questions',
+    'participant.enterLongAnswer': 'Type your answer...',
 
     // Quiz Builder
     'builder.back': 'Back',
@@ -398,6 +405,12 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'lecturer.connected': 'Connected',
     'lecturer.disconnected': 'Disconnected',
     'lecturer.participant': 'participant',
+    'lecturer.statusCreated': 'Created',
+    'lecturer.statusActive': 'Active',
+    'lecturer.statusEnded': 'Ended',
+    'lecturer.modeRush': 'Rush Mode',
+    'lecturer.modeThinking': 'Thinking Mode',
+    'lecturer.modeSeminar': 'Seminar Mode',
     'lecturer.gamePin': 'Game PIN',
     'lecturer.qrCodeAlt': 'Join quiz QR code',
     'lecturer.qrCodeInstructions': 'Students can scan the QR code or visit https://thinktap.link/session/join to enter the PIN and nickname.',
@@ -433,6 +446,18 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'lecturer.createQuestionDescription': 'Create a new question for your session',
     'lecturer.options': 'Options',
     'lecturer.correctAnswer': 'Correct Answer',
+
+    // Join Session
+    'join.title': 'Join Session',
+    'join.description': 'Enter the 6-digit code provided by your lecturer',
+    'join.button': 'Join Session',
+    'join.joining': 'Joining...',
+    'join.clear': 'Clear',
+    'join.digitsEntered': '{count}/6 digits entered',
+    'join.invalidCode': 'Please enter a valid 6-digit code',
+    'join.sessionFound': 'Session found! Enter your nickname to join.',
+    'join.noCode': "Don't have a code? Ask your lecturer or",
+    'join.signInAsLecturer': 'sign in as a lecturer',
 
     // Common
     'common.loading': 'Loading...',
@@ -750,6 +775,12 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'participant.failedLoadResults': '加载您的结果失败',
     'participant.getReady': '准备就绪！',
     'participant.quizStarting': '测验即将开始...',
+    'participant.sessionCompleteTitle': '课程结束！',
+    'participant.greatJobWithName': '{name}，做得好！',
+    'participant.greatJob': '做得好！',
+    'participant.rankOf': '排名第 {rank} 名',
+    'participant.outOfParticipants': '共 {count} 名参与者',
+    'participant.summary': '您共回答了 {questions} 道题中的 {responses} 道',
 
     // Quiz Builder
     'builder.back': '返回',
@@ -818,6 +849,33 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'lecturer.sessionEnded': '课程已结束',
     'lecturer.getReady': '准备就绪！',
     'lecturer.quizStarting': '测验即将开始...',
+    'lecturer.statusCreated': '已创建',
+    'lecturer.statusActive': '进行中',
+    'lecturer.statusEnded': '已结束',
+    'lecturer.modeRush': '快速模式',
+    'lecturer.modeThinking': '思考模式',
+    'lecturer.modeSeminar': '研讨模式',
+    'lecturer.gamePin': '游戏 PIN',
+    'lecturer.qrCodeAlt': '加入测验二维码',
+    'lecturer.qrCodeInstructions': '学生可以扫描二维码或访问 https://thinktap.link/session/join 以输入 PIN 和昵称。',
+    'lecturer.firstQuestionStarting': '第一题即将开始...',
+    'lecturer.readyToStart': '准备开始',
+    'lecturer.question': '个问题',
+    'lecturer.questions': '个问题',
+    'lecturer.ready': '准备就绪',
+    'lecturer.startFirstQuestion': '开始第一题',
+
+    // Join Session
+    'join.title': '加入课程',
+    'join.description': '输入讲师提供的6位数字代码',
+    'join.button': '加入课程',
+    'join.joining': '正在加入...',
+    'join.clear': '清除',
+    'join.digitsEntered': '已输入 {count}/6 位数字',
+    'join.invalidCode': '请输入有效的6位数字代码',
+    'join.sessionFound': '找到课程！请输入您的昵称加入。',
+    'join.noCode': '没有代码？请询问您的讲师或',
+    'join.signInAsLecturer': '以讲师身份登录',
 
     // Common
     'common.loading': '加载中...',
@@ -1052,6 +1110,12 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'participant.failedLoadResults': 'Gagal memuatkan keputusan anda',
     'participant.getReady': 'Bersedia!',
     'participant.quizStarting': 'Kuiz akan bermula tidak lama lagi...',
+    'participant.sessionCompleteTitle': 'Sesi Tamat!',
+    'participant.greatJobWithName': 'Tahniah, {name}!',
+    'participant.greatJob': 'Tahniah!',
+    'participant.rankOf': 'Kedudukan #{rank}',
+    'participant.outOfParticipants': 'Daripada {count} peserta',
+    'participant.summary': 'Anda menjawab {responses} daripada {questions} soalan',
 
     // Quiz Builder
     'builder.back': 'Kembali',
@@ -1122,6 +1186,18 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'lecturer.quizStarting': 'Kuiz akan bermula tidak lama lagi...',
     'lecturer.back': 'Kembali',
     'lecturer.connected': 'Disambungkan',
+
+    // Join Session
+    'join.title': 'Sertai Sesi',
+    'join.description': 'Masukkan kod 6 digit yang diberikan oleh pensyarah anda',
+    'join.button': 'Sertai Sesi',
+    'join.joining': 'Menyertai...',
+    'join.clear': 'Kosongkan',
+    'join.digitsEntered': '{count}/6 digit dimasukkan',
+    'join.invalidCode': 'Sila masukkan kod 6 digit yang sah',
+    'join.sessionFound': 'Sesi dijumpai! Masukkan nama samaran anda untuk menyertai.',
+    'join.noCode': 'Tiada kod? Tanya pensyarah anda atau',
+    'join.signInAsLecturer': 'log masuk sebagai pensyarah',
     'lecturer.disconnected': 'Terputus',
     'lecturer.participant': 'peserta',
     'lecturer.gamePin': 'PIN Permainan',
@@ -1150,6 +1226,12 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'lecturer.failedEndSession': 'Gagal menamatkan sesi',
     'lecturer.notConnected': 'Tidak disambungkan. Sila tunggu...',
     'lecturer.rankingsLoadWarning': 'Tidak dapat memuatkan kedudukan, tetapi sesi telah berjaya ditamatkan',
+    'lecturer.statusCreated': 'Dicipta',
+    'lecturer.statusActive': 'Aktif',
+    'lecturer.statusEnded': 'Ditamatkan',
+    'lecturer.modeRush': 'Mod Rush',
+    'lecturer.modeThinking': 'Mod Berfikir',
+    'lecturer.modeSeminar': 'Mod Seminar',
 
     // Common
     'common.loading': 'Memuatkan...',
@@ -1467,6 +1549,12 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'participant.failedLoadResults': '結果の読み込みに失敗しました',
     'participant.getReady': '準備してください！',
     'participant.quizStarting': 'クイズがまもなく開始されます...',
+    'participant.sessionCompleteTitle': 'セッション完了！',
+    'participant.greatJobWithName': '{name}さん、お疲れさまでした！',
+    'participant.greatJob': 'お疲れさまでした！',
+    'participant.rankOf': '第{rank}位',
+    'participant.outOfParticipants': '{count}人中',
+    'participant.summary': '{questions}問中{responses}問に回答しました',
 
     // Quiz Builder
     'builder.back': '戻る',
@@ -1535,6 +1623,33 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'lecturer.sessionEnded': 'セッション終了',
     'lecturer.getReady': '準備してください！',
     'lecturer.quizStarting': 'クイズがまもなく開始されます...',
+    'lecturer.statusCreated': '作成済み',
+    'lecturer.statusActive': 'アクティブ',
+    'lecturer.statusEnded': '終了',
+    'lecturer.modeRush': 'ラッシュモード',
+    'lecturer.modeThinking': 'シンキングモード',
+    'lecturer.modeSeminar': 'セミナーモード',
+    'lecturer.gamePin': 'ゲーム PIN',
+    'lecturer.qrCodeAlt': 'クイズ参加QRコード',
+    'lecturer.qrCodeInstructions': '学生はQRコードをスキャンするか、https://thinktap.link/session/join にアクセスしてPINとニックネームを入力できます。',
+    'lecturer.firstQuestionStarting': '最初の問題がまもなく開始されます...',
+    'lecturer.readyToStart': '開始の準備ができました',
+    'lecturer.question': '質問',
+    'lecturer.questions': '質問',
+    'lecturer.ready': '準備完了',
+    'lecturer.startFirstQuestion': '最初の問題を開始',
+
+    // Join Session
+    'join.title': 'セッションに参加',
+    'join.description': '講師から提供された6桁のコードを入力してください',
+    'join.button': 'セッションに参加',
+    'join.joining': '参加中...',
+    'join.clear': 'クリア',
+    'join.digitsEntered': '{count}/6 桁入力済み',
+    'join.invalidCode': '有効な6桁のコードを入力してください',
+    'join.sessionFound': 'セッションが見つかりました！ニックネームを入力して参加してください。',
+    'join.noCode': 'コードをお持ちでない場合は、講師に尋ねるか、',
+    'join.signInAsLecturer': '講師としてログイン',
 
     // Common
     'common.loading': '読み込み中...',
@@ -1571,8 +1686,14 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const t = (key: string): string => {
-    return translations[language][key] ?? translations.en[key] ?? key;
+  const t = (key: string, params?: Record<string, string | number>): string => {
+    let text = translations[language][key] ?? translations.en[key] ?? key;
+    if (params) {
+      Object.entries(params).forEach(([paramKey, paramValue]) => {
+        text = text.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(paramValue));
+      });
+    }
+    return text;
   };
 
   return (

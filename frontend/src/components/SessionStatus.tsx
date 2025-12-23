@@ -1,5 +1,8 @@
+'use client';
+
 import { Badge } from '@/components/ui/badge';
 import { SessionStatus as StatusEnum } from '@/types/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface SessionStatusProps {
   status: string;
@@ -7,20 +10,22 @@ interface SessionStatusProps {
 }
 
 export function SessionStatus({ status, className = '' }: SessionStatusProps) {
-  const statusConfig: Record<string, { variant: any; label: string; color: string }> = {
+  const { t } = useLanguage();
+  
+  const statusConfig: Record<string, { variant: any; labelKey: string; color: string }> = {
     CREATED: {
       variant: 'secondary',
-      label: 'Created',
+      labelKey: 'lecturer.statusCreated',
       color: 'bg-gray-100 text-gray-800',
     },
     ACTIVE: {
       variant: 'default',
-      label: 'Active',
+      labelKey: 'lecturer.statusActive',
       color: 'bg-green-100 text-green-800',
     },
     ENDED: {
       variant: 'outline',
-      label: 'Ended',
+      labelKey: 'lecturer.statusEnded',
       color: 'bg-red-100 text-red-800',
     },
   };
@@ -32,7 +37,7 @@ export function SessionStatus({ status, className = '' }: SessionStatusProps) {
       variant={config.variant} 
       className={`${config.color} ${className}`}
     >
-      {config.label}
+      {t(config.labelKey)}
     </Badge>
   );
 }
@@ -43,18 +48,20 @@ interface ModeStatusProps {
 }
 
 export function ModeStatus({ mode, className = '' }: ModeStatusProps) {
-  const modeConfig: Record<string, { color: string; label: string }> = {
+  const { t } = useLanguage();
+  
+  const modeConfig: Record<string, { color: string; labelKey: string }> = {
     RUSH: {
       color: 'bg-red-100 text-red-800',
-      label: 'Rush Mode',
+      labelKey: 'lecturer.modeRush',
     },
     THINKING: {
       color: 'bg-orange-100 text-orange-800',
-      label: 'Thinking Mode',
+      labelKey: 'lecturer.modeThinking',
     },
     SEMINAR: {
       color: 'bg-green-100 text-green-800',
-      label: 'Seminar Mode',
+      labelKey: 'lecturer.modeSeminar',
     },
   };
 
@@ -62,7 +69,7 @@ export function ModeStatus({ mode, className = '' }: ModeStatusProps) {
 
   return (
     <Badge className={`${config.color} ${className}`}>
-      {config.label}
+      {t(config.labelKey)}
     </Badge>
   );
 }
